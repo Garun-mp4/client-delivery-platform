@@ -15,10 +15,24 @@ describe('observability foundation', () => {
     });
     const logger = createLogger({ service: 'test', destination });
 
-    logger.info({ token: 'sensitive-token', password: 'sensitive-password' }, 'safe event');
+    logger.info(
+      {
+        environment: {
+          DATABASE_URL: 'postgresql://user:database-secret@database.example.test/app',
+          REDIS_URL: 'redis://:redis-secret@redis.example.test:6379',
+        },
+        password: 'sensitive-password',
+        request: { headers: { authorization: 'Bearer sensitive-authorization' } },
+        token: 'sensitive-token',
+      },
+      'safe event',
+    );
 
     expect(output).not.toContain('sensitive-token');
     expect(output).not.toContain('sensitive-password');
+    expect(output).not.toContain('database-secret');
+    expect(output).not.toContain('redis-secret');
+    expect(output).not.toContain('sensitive-authorization');
     expect(output).toContain('[REDACTED]');
   });
 

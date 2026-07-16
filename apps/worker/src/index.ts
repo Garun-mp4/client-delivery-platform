@@ -9,7 +9,11 @@ import { createLogger, getOrCreateRequestId } from '@garun/observability';
 import { createWorkerHealthResponse } from './health';
 
 const environment = parseWorkerEnv();
-const logger = createLogger({ service: 'worker', level: environment.LOG_LEVEL });
+const logger = createLogger({
+  environment: environment.APP_ENV,
+  level: environment.LOG_LEVEL,
+  service: 'worker',
+});
 
 function sendJson(response: ServerResponse, statusCode: number, body: unknown, requestId: string) {
   response.writeHead(statusCode, {
@@ -41,6 +45,7 @@ const server = createServer(async (request, response) => {
       enableOfflineQueue: false,
       lazyConnect: true,
       maxRetriesPerRequest: 1,
+      retryStrategy: () => null,
     });
     redis.on('error', () => undefined);
 
@@ -60,6 +65,11 @@ const server = createServer(async (request, response) => {
 
   sendJson(response, 404, { error: { code: 'NOT_FOUND', requestId } }, requestId);
 });
+
+server.headersTimeout = 10_000;
+server.keepAliveTimeout = 5_000;
+server.maxHeadersCount = 50;
+server.requestTimeout = 10_000;
 
 server.listen(environment.WORKER_PORT, environment.WORKER_HOST, () => {
   logger.info(

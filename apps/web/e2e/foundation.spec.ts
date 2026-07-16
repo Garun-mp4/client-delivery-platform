@@ -18,6 +18,22 @@ test('foundation page has no automatically detectable accessibility violations',
   expect(results.violations).toEqual([]);
 });
 
+test('uses a nonce-based production content security policy', async ({ page }) => {
+  const response = await page.goto('/');
+  const policy = response?.headers()['content-security-policy'];
+
+  expect(policy).toBeTruthy();
+  expect(policy).not.toContain("'unsafe-inline'");
+  expect(policy).not.toContain("'unsafe-eval'");
+  expect(policy).toMatch(/script-src 'self' 'nonce-[A-Za-z0-9-]+' 'strict-dynamic'/);
+
+  const scriptNonces = await page
+    .locator('script[nonce]')
+    .evaluateAll((scripts) => scripts.map((script) => script.getAttribute('nonce')));
+  expect(scriptNonces.length).toBeGreaterThan(0);
+  expect(new Set(scriptNonces).size).toBe(1);
+});
+
 test('liveness exposes no secrets and returns a correlation id', async ({ request }) => {
   const response = await request.get('/api/health/live', {
     headers: { 'x-request-id': 'playwright-request' },

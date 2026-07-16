@@ -10,6 +10,7 @@ playwright-report/
 test-results/
 .turbo/
 *.tsbuildinfo
+apps/web/next-env.d.ts
 
 # Environment files: examples are intentionally committed
 .env

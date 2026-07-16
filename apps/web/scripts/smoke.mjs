@@ -3,6 +3,7 @@ const baseUrl = process.env.WEB_BASE_URL ?? 'http://127.0.0.1:3000';
 async function assertResponse(path, expectedStatus = 200) {
   const response = await fetch(`${baseUrl}${path}`, {
     headers: { 'x-request-id': 'smoke-request' },
+    signal: AbortSignal.timeout(5_000),
   });
 
   if (response.status !== expectedStatus) {

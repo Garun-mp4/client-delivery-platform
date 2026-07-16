@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "smoke": "node scripts/smoke.mjs"
@@ -20,7 +20,6 @@
     "@garun/ui": "workspace:*",
     "ioredis": "catalog:",
     "next": "catalog:",
-    "pino": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"
   },

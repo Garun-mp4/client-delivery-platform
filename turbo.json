@@ -67,7 +67,7 @@
     },
     "test:e2e": {
       "cache": false,
-      "env": ["CI", "WEB_BASE_URL"]
+      "env": ["CI", "WEB_BASE_URL", "WEB_SERVER_PORT"]
     },
     "db:generate": {
       "cache": false,
@@ -80,6 +80,10 @@
     "smoke": {
       "cache": false,
       "env": ["WEB_BASE_URL", "WORKER_BASE_URL"]
+    },
+    "verify:artifact": {
+      "dependsOn": ["build"],
+      "outputs": []
     }
   }
 }

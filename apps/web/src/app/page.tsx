@@ -1,8 +1,11 @@
+import { connection } from 'next/server';
+
 import { parseProductConfig } from '@garun/config';
 import { Card } from '@garun/ui/card';
 import { StatusBadge } from '@garun/ui/status-badge';
 
-export default function HomePage() {
+export default async function HomePage() {
+  await connection();
   const product = parseProductConfig();
 
   return (

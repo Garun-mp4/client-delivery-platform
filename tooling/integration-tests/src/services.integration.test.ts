@@ -20,17 +20,35 @@ const mailpitUrl = requireEnvironment('TEST_MAILPIT_URL');
 
 const pool = new Pool({ connectionString: databaseUrl });
 const redis = new Redis(redisUrl, { enableOfflineQueue: false, maxRetriesPerRequest: 1 });
+const unauthenticatedRedisUrl = new URL(redisUrl);
+unauthenticatedRedisUrl.password = '';
+unauthenticatedRedisUrl.username = '';
+const unauthenticatedRedis = new Redis(unauthenticatedRedisUrl.toString(), {
+  enableOfflineQueue: false,
+  enableReadyCheck: false,
+  maxRetriesPerRequest: 1,
+  retryStrategy: () => null,
+});
+unauthenticatedRedis.on('error', () => undefined);
 const s3 = new S3Client({
   endpoint: minioEndpoint,
   forcePathStyle: true,
   region: 'us-east-1',
   credentials: { accessKeyId: minioAccessKey, secretAccessKey: minioSecretKey },
 });
+const unauthenticatedS3 = new S3Client({
+  endpoint: minioEndpoint,
+  forcePathStyle: true,
+  region: 'us-east-1',
+  credentials: { accessKeyId: 'invalid-access-key', secretAccessKey: 'invalid-secret-key' },
+});
 
 afterAll(async () => {
   await pool.end();
   redis.disconnect();
+  unauthenticatedRedis.disconnect();
   s3.destroy();
+  unauthenticatedS3.destroy();
 });
 
 describe('local infrastructure', () => {
@@ -45,9 +63,17 @@ describe('local infrastructure', () => {
     await expect(redis.ping()).resolves.toBe('PONG');
   });
 
+  it('rejects unauthenticated Redis commands', async () => {
+    await expect(unauthenticatedRedis.ping()).rejects.toThrow(/NOAUTH/);
+  });
+
   it('exposes an authenticated S3-compatible MinIO API', async () => {
     const result = await s3.send(new ListBucketsCommand({}));
     expect(result.$metadata.httpStatusCode).toBe(200);
+  });
+
+  it('rejects invalid MinIO credentials', async () => {
+    await expect(unauthenticatedS3.send(new ListBucketsCommand({}))).rejects.toThrow();
   });
 
   it('exposes the local Mailpit API without sending real email', async () => {

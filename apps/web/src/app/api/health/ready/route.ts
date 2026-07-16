@@ -9,7 +9,7 @@ import { createHealthResponse } from '@/lib/health';
 
 export const dynamic = 'force-dynamic';
 
-const logger = createLogger({ service: 'web' });
+const logger = createLogger({ environment: process.env.APP_ENV, service: 'web' });
 
 export async function GET(request: Request) {
   const requestId = getOrCreateRequestId(request.headers.get('x-request-id'));
@@ -21,6 +21,7 @@ export async function GET(request: Request) {
       enableOfflineQueue: false,
       lazyConnect: true,
       maxRetriesPerRequest: 1,
+      retryStrategy: () => null,
     });
     redis.on('error', () => undefined);
 

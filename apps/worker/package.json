@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "verify:artifact": "node scripts/verify-artifact.mjs",
     "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {

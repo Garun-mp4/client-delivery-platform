@@ -7,6 +7,18 @@ const redactPaths = [
   'token',
   'magicLink',
   'previewSecret',
+  'DATABASE_URL',
+  'REDIS_URL',
+  'databaseUrl',
+  'redisUrl',
+  '*.DATABASE_URL',
+  '*.REDIS_URL',
+  '*.authorization',
+  '*.cookie',
+  '*.magicLink',
+  '*.password',
+  '*.previewSecret',
+  '*.token',
   'req.headers.authorization',
   'req.headers.cookie',
   'request.headers.authorization',
@@ -15,13 +27,19 @@ const redactPaths = [
 
 export interface LoggerOptions {
   readonly service: string;
+  readonly environment?: string;
   readonly level?: LevelWithSilent;
   readonly destination?: DestinationStream;
 }
 
-export function createLogger({ service, level = 'info', destination }: LoggerOptions): Logger {
+export function createLogger({
+  service,
+  environment = 'unknown',
+  level = 'info',
+  destination,
+}: LoggerOptions): Logger {
   const options: pino.LoggerOptions = {
-    base: { service },
+    base: { environment, service },
     level,
     messageKey: 'message',
     redact: {
