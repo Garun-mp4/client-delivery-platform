@@ -1,10 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const webServerPort = process.env.WEB_SERVER_PORT ?? '3100';
-const baseURL = process.env.WEB_BASE_URL ?? `http://127.0.0.1:${webServerPort}`;
+const baseURL = process.env.WEB_BASE_URL ?? `http://localhost:${webServerPort}`;
 
 export default defineConfig({
   testDir: './e2e',
+  globalSetup: './e2e/global-setup.ts',
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
@@ -15,13 +16,25 @@ export default defineConfig({
   },
   projects: [
     { name: 'chrome', use: { ...devices['Desktop Chrome'], channel: 'chrome' } },
-    { name: 'mobile-chrome', use: { ...devices['Pixel 7'], channel: 'chrome' } },
+    {
+      name: 'mobile-chrome',
+      testIgnore: ['**/identity.spec.ts'],
+      use: { ...devices['Pixel 7'], channel: 'chrome' },
+    },
   ],
-  webServer: {
-    command: 'pnpm start',
-    env: { PORT: webServerPort },
-    reuseExistingServer: false,
-    timeout: 120_000,
-    url: baseURL,
-  },
+  webServer: [
+    {
+      command: 'pnpm start',
+      env: { PORT: webServerPort, PUBLIC_APP_URL: baseURL },
+      reuseExistingServer: false,
+      timeout: 120_000,
+      url: baseURL,
+    },
+    {
+      command: 'pnpm --filter @garun/worker start',
+      reuseExistingServer: true,
+      timeout: 120_000,
+      url: 'http://127.0.0.1:3001/health/live',
+    },
+  ],
 });

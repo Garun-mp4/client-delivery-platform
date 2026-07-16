@@ -1,12 +1,18 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
-test('shows only the foundation status page', async ({ page }) => {
+test('shows the product entry page', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.getByRole('heading', { name: 'Garun Workspace' })).toBeVisible();
   await expect(page.getByText('Инженерная основа запущена')).toBeVisible();
   await expect(page).toHaveTitle('Garun Workspace');
+});
+
+test('login page has no automatically detectable accessibility violations', async ({ page }) => {
+  await page.goto('/login');
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(results.violations).toEqual([]);
 });
 
 test('foundation page has no automatically detectable accessibility violations', async ({
