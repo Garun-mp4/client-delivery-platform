@@ -1,0 +1,29 @@
+# Dependencies and package-manager state
+node_modules/
+.pnpm-store/
+
+# Build and test output
+.next/
+dist/
+coverage/
+playwright-report/
+test-results/
+.turbo/
+*.tsbuildinfo
+apps/web/next-env.d.ts
+
+# Environment files: examples are intentionally committed
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Local infrastructure data
+infra/data/
+
+# Logs and operating-system/editor files
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

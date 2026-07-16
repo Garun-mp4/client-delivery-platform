@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'feat/**', 'docs/**']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      APP_ENV: test
+      APP_NAME: Garun Workspace
+      PUBLIC_APP_URL: http://127.0.0.1:3000
+      LOG_LEVEL: info
+      DATABASE_URL: postgresql://garun:local_only_change_me@127.0.0.1:5432/garun_workspace
+      REDIS_URL: redis://:local_only_change_me@127.0.0.1:6379
+      WORKER_HOST: 127.0.0.1
+      WORKER_PORT: 3001
+      TEST_DATABASE_URL: postgresql://garun:local_only_change_me@127.0.0.1:5432/garun_workspace
+      TEST_REDIS_URL: redis://:local_only_change_me@127.0.0.1:6379
+      TEST_MINIO_ENDPOINT: http://127.0.0.1:9000
+      TEST_MINIO_ACCESS_KEY: garun_local
+      TEST_MINIO_SECRET_KEY: local_only_change_me
+      TEST_MAILPIT_URL: http://127.0.0.1:8025
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.22.2
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Verify generated migrations are current
+        run: |
+          pnpm db:generate
+          git diff --exit-code -- packages/db/migrations
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Start local dependencies
+        run: |
+          cp infra/.env.example infra/.env
+          docker compose -f infra/compose.yaml up -d --wait
+
+      - name: Apply migrations
+        run: pnpm db:migrate
+
+      - name: Integration tests
+        run: pnpm test:integration
+
+      - name: Production build
+        run: pnpm build
+
+      - name: Verify production artifacts
+        run: pnpm verify:artifacts
+
+      - name: Browser and accessibility tests
+        run: pnpm test:e2e
+
+      - name: Smoke web and worker
+        shell: bash
+        run: |
+          pnpm --filter @garun/web start > web.log 2>&1 &
+          pnpm --filter @garun/worker start > worker.log 2>&1 &
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:3000/api/health/live >/dev/null && \
+              curl --fail --silent http://127.0.0.1:3001/health/live >/dev/null && break
+            sleep 1
+          done
+          pnpm smoke
+
+      - name: Show service logs on failure
+        if: failure()
+        run: |
+          docker compose -f infra/compose.yaml ps
+          docker compose -f infra/compose.yaml logs --no-color
+          cat web.log worker.log 2>/dev/null || true
+
+      - name: Stop local dependencies
+        if: always()
+        run: docker compose -f infra/compose.yaml down

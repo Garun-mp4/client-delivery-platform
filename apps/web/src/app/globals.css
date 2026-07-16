@@ -1,0 +1,25 @@
+@import 'tailwindcss';
+@source '../../../../packages/ui/src';
+
+:root {
+  color-scheme: light;
+  --page-background: #f8fafc;
+  --page-foreground: #0f172a;
+  --brand-accent: #1d4ed8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--page-background);
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--page-background);
+  color: var(--page-foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}

@@ -1,0 +1,4 @@
+{
+  "extends": "@garun/typescript-config/library.json",
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.config.ts", "vitest.setup.ts"]
+}
