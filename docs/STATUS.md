@@ -54,8 +54,10 @@
 - `docker compose up -d --build --wait` собрал общий image, применил migrations и дождался healthy web, worker, PostgreSQL, Redis, MinIO и Mailpit; migration service завершился с кодом 0.
 - `docker compose down` → `docker compose up -d --wait` повторно поднял stack за 19 секунд без удаления named volumes; существующий owner сохранился.
 - Container runtime проверен как non-root UID 1000; Compose logs не содержат настроенных локальных secret values; host `DATABASE_URL` не подменяет container service URL.
-- `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:integration` (10/10), `pnpm build`, `pnpm verify:artifacts`, `pnpm test:e2e` (13/13), повторный `pnpm smoke` и `pnpm audit --prod` прошли.
+- `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:integration` (10/10), `pnpm build`, `pnpm verify:artifacts`, `pnpm test:e2e` (14/14), повторный `pnpm smoke` и `pnpm audit --prod` прошли.
 - Первый smoke сразу после параллельного E2E попал в пятосекундный timeout во время dev-компиляции `/`; readiness оставался healthy, повтор после завершения компиляции прошёл. Production build/E2E этой проблемы не показали.
+- Локальный password login в Compose раньше создавал session cookie, но перенаправлял браузер на внутренний адрес `http://0.0.0.0:3000`; browser терял host-only cookie и возвращался на login. Все form redirects переведены на валидированный `PUBLIC_APP_URL`, внешний origin запрещён unit-тестом, а отдельный E2E теперь проверяет реальный password login до защищённого workspace.
+- После исправления единый Compose пересобран и дождался всех healthchecks; ручная HTTP-проверка через `localhost:3000` подтвердила `303` на публичный origin, создание cookie, переход в `demo-studio` и HTTP 200 защищённой страницы. E2E прошёл 14/14, включая нажатие «Войти с паролем».
 
 ## Следующие действия
 

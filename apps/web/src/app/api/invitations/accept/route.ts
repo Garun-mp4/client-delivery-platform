@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { acceptInvitation, createInvitationSessionResponse, InvitationError } from '@garun/auth';
 import { user, workspace } from '@garun/db/schema';
 
+import { publicAppUrl } from '@/lib/public-url';
 import { database, environment } from '@/lib/server';
 import { allowSensitiveRequest } from '@/lib/rate-limit';
 
@@ -11,10 +12,10 @@ export async function POST(request: Request) {
   const form = await request.formData();
   const token = form.get('token');
   if (typeof token !== 'string')
-    return NextResponse.redirect(new URL('/invite/invalid', request.url), 303);
+    return NextResponse.redirect(publicAppUrl(environment.PUBLIC_APP_URL, '/invite/invalid'), 303);
   const source = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
   if (!(await allowSensitiveRequest('invitation-accept', source, 20, 300))) {
-    return NextResponse.redirect(new URL('/invite/invalid', request.url), 303);
+    return NextResponse.redirect(publicAppUrl(environment.PUBLIC_APP_URL, '/invite/invalid'), 303);
   }
   let accepted: Awaited<ReturnType<typeof acceptInvitation>>;
   try {
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
       error instanceof InvitationError && error.code === 'INVITATION_EXPIRED'
         ? 'expired'
         : 'invalid';
-    return NextResponse.redirect(new URL(`/invite/${path}`, request.url), 303);
+    return NextResponse.redirect(publicAppUrl(environment.PUBLIC_APP_URL, `/invite/${path}`), 303);
   }
 
   const [acceptedIdentity] = await database.db
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
     .where(eq(user.id, accepted.userId))
     .limit(1);
   if (!acceptedIdentity)
-    return NextResponse.redirect(new URL('/invite/accepted', request.url), 303);
+    return NextResponse.redirect(publicAppUrl(environment.PUBLIC_APP_URL, '/invite/accepted'), 303);
 
   try {
     return await createInvitationSessionResponse(database.db, environment, {
@@ -45,6 +46,6 @@ export async function POST(request: Request) {
       headers: new Headers(request.headers),
     });
   } catch {
-    return NextResponse.redirect(new URL('/invite/accepted', request.url), 303);
+    return NextResponse.redirect(publicAppUrl(environment.PUBLIC_APP_URL, '/invite/accepted'), 303);
   }
 }

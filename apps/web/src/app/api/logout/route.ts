@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 
 import { auditEvent } from '@garun/db/schema';
 
-import { auth, database } from '@/lib/server';
+import { publicAppUrl } from '@/lib/public-url';
+import { auth, database, environment } from '@/lib/server';
 
 export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
   }
   const outgoing = new NextResponse(null, {
     status: 303,
-    headers: { location: new URL('/login', request.url).toString() },
+    headers: { location: publicAppUrl(environment.PUBLIC_APP_URL, '/login').toString() },
   });
   for (const cookie of response.headers.getSetCookie())
     outgoing.headers.append('set-cookie', cookie);

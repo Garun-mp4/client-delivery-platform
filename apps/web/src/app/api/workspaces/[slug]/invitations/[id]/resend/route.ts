@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { resendInvitation } from '@garun/auth';
 import { tenantFromRequest } from '@/lib/access';
+import { publicAppUrl } from '@/lib/public-url';
 import { database, environment } from '@/lib/server';
 export async function POST(
   request: Request,
@@ -21,7 +22,10 @@ export async function POST(
       },
       { requestId: request.headers.get('x-request-id') ?? undefined },
     );
-    return NextResponse.redirect(new URL(`/workspace/${slug}?success=resent`, request.url), 303);
+    return NextResponse.redirect(
+      publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}?success=resent`),
+      303,
+    );
   } catch {
     return NextResponse.json({ error: { code: 'NOT_FOUND' } }, { status: 404 });
   }

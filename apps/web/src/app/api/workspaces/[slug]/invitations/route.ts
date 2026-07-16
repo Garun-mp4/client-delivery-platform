@@ -4,6 +4,7 @@ import { createInvitation, InvitationError } from '@garun/auth';
 import { can } from '@garun/core/identity';
 
 import { tenantFromRequest } from '@/lib/access';
+import { publicAppUrl } from '@/lib/public-url';
 import { allowSensitiveRequest } from '@/lib/rate-limit';
 import { database, environment } from '@/lib/server';
 
@@ -14,12 +15,18 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
     return NextResponse.json({ error: { code: 'NOT_FOUND' } }, { status: 404 });
   }
   if (!(await allowSensitiveRequest('invitation-create', tenant.userId, 20, 3600))) {
-    return NextResponse.redirect(new URL(`/workspace/${slug}?error=rate_limit`, request.url), 303);
+    return NextResponse.redirect(
+      publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}?error=rate_limit`),
+      303,
+    );
   }
   const form = await request.formData();
   const email = form.get('email');
   if (typeof email !== 'string')
-    return NextResponse.redirect(new URL(`/workspace/${slug}?error=invite`, request.url), 303);
+    return NextResponse.redirect(
+      publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}?error=invite`),
+      303,
+    );
   try {
     await createInvitation(
       database,
@@ -32,9 +39,15 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
       },
       { requestId: request.headers.get('x-request-id') ?? undefined },
     );
-    return NextResponse.redirect(new URL(`/workspace/${slug}?success=invite`, request.url), 303);
+    return NextResponse.redirect(
+      publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}?success=invite`),
+      303,
+    );
   } catch (error) {
     const code = error instanceof InvitationError ? error.code.toLowerCase() : 'invite';
-    return NextResponse.redirect(new URL(`/workspace/${slug}?error=${code}`, request.url), 303);
+    return NextResponse.redirect(
+      publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}?error=${code}`),
+      303,
+    );
   }
 }

@@ -1,12 +1,13 @@
 import { existsSync } from 'node:fs';
 import { loadEnvFile } from 'node:process';
 
-import { eq } from 'drizzle-orm';
+import { hashPassword } from 'better-auth/crypto';
+import { and, eq } from 'drizzle-orm';
 
 import { createAuth } from '@garun/auth';
 import { parseWebEnv } from '@garun/config';
 import { createDatabaseClient } from '@garun/db';
-import { auditEvent, user, workspace, workspaceMembership } from '@garun/db/schema';
+import { account, auditEvent, user, workspace, workspaceMembership } from '@garun/db/schema';
 
 export default async function globalSetup() {
   if (existsSync('.env')) loadEnvFile('.env');
@@ -22,6 +23,25 @@ export default async function globalSetup() {
       [owner] = await database.db.select({ id: user.id }).from(user).where(eq(user.email, email));
     }
     if (!owner) throw new Error('E2E owner bootstrap failed');
+    const passwordHash = await hashPassword(password);
+    const [credential] = await database.db
+      .select({ id: account.id })
+      .from(account)
+      .where(and(eq(account.userId, owner.id), eq(account.providerId, 'credential')))
+      .limit(1);
+    if (credential) {
+      await database.db
+        .update(account)
+        .set({ password: passwordHash, updatedAt: new Date() })
+        .where(eq(account.id, credential.id));
+    } else {
+      await database.db.insert(account).values({
+        accountId: owner.id,
+        providerId: 'credential',
+        userId: owner.id,
+        password: passwordHash,
+      });
+    }
     const [existing] = await database.db
       .select({ id: workspace.id })
       .from(workspace)

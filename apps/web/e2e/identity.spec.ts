@@ -36,6 +36,19 @@ async function latestLink(request: APIRequestContext, recipient: string, afterId
   return { id, link };
 }
 
+test('owner signs in with a password and reaches the protected workspace', async ({ page }) => {
+  const ownerEmail = process.env.E2E_OWNER_EMAIL ?? 'e2e-owner@example.test';
+  const ownerPassword = process.env.E2E_OWNER_PASSWORD ?? 'E2eOwnerPassword-2026!';
+
+  await page.goto('/login');
+  await page.getByLabel('Email', { exact: true }).fill(ownerEmail);
+  await page.getByLabel('Пароль').fill(ownerPassword);
+  await page.getByRole('button', { name: 'Войти с паролем' }).click();
+
+  await expect(page).toHaveURL(/\/workspace\/e2e-studio/);
+  await expect(page.getByText(ownerEmail, { exact: true })).toBeVisible();
+});
+
 test('owner invites a member and tenant policies deny owner actions to the member', async ({
   browser,
   page,

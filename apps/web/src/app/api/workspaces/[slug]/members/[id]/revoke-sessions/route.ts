@@ -5,7 +5,8 @@ import { can } from '@garun/core/identity';
 import { auditEvent, session, workspaceMembership } from '@garun/db/schema';
 
 import { tenantFromRequest } from '@/lib/access';
-import { database } from '@/lib/server';
+import { publicAppUrl } from '@/lib/public-url';
+import { database, environment } from '@/lib/server';
 
 export async function POST(
   request: Request,
@@ -39,5 +40,8 @@ export async function POST(
       metadata: { targetUserId: target.userId },
     });
   });
-  return NextResponse.redirect(new URL(`/workspace/${slug}?success=sessions`, request.url), 303);
+  return NextResponse.redirect(
+    publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}?success=sessions`),
+    303,
+  );
 }

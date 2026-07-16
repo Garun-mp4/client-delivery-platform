@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { revokeInvitation } from '@garun/auth';
 import { tenantFromRequest } from '@/lib/access';
-import { database } from '@/lib/server';
+import { publicAppUrl } from '@/lib/public-url';
+import { database, environment } from '@/lib/server';
 export async function POST(
   request: Request,
   context: { params: Promise<{ slug: string; id: string }> },
@@ -16,7 +17,10 @@ export async function POST(
     await revokeInvitation(database, tenant, id, {
       requestId: request.headers.get('x-request-id') ?? undefined,
     });
-    return NextResponse.redirect(new URL(`/workspace/${slug}?success=revoked`, request.url), 303);
+    return NextResponse.redirect(
+      publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}?success=revoked`),
+      303,
+    );
   } catch {
     return NextResponse.json({ error: { code: 'NOT_FOUND' } }, { status: 404 });
   }

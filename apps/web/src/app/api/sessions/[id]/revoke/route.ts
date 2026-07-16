@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 
 import { auditEvent, session } from '@garun/db/schema';
 
-import { auth, database } from '@/lib/server';
+import { publicAppUrl } from '@/lib/public-url';
+import { auth, database, environment } from '@/lib/server';
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const identity = await auth.api.getSession({ headers: request.headers });
@@ -24,5 +25,5 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     entityId: revoked.id,
     requestId: request.headers.get('x-request-id') ?? undefined,
   });
-  return NextResponse.redirect(new URL('/workspace', request.url), 303);
+  return NextResponse.redirect(publicAppUrl(environment.PUBLIC_APP_URL, '/workspace'), 303);
 }
