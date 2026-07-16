@@ -1,13 +1,13 @@
 # Статус реализации
 
 Последнее обновление: 2026-07-16
-Общий статус: архитектурное планирование, реализация продукта не начата
+Общий статус: Milestone 00 завершён; Milestone 01 разрешён и начат
 
 ## Текущий milestone
 
-**Milestone 00 — архитектурная baseline.**
+**Milestone 01 — engineering foundation.**
 
-Содержательная работа завершена. Milestone ожидает ревью владельца и подтверждения открытых решений из `docs/DECISIONS.md`. Переход к Milestone 01 запрещён до явного разрешения начать реализацию.
+План и граница MVP Milestones 01–10 подтверждены владельцем. Scope текущей работы ограничен monorepo, web/worker foundation, локальной инфраструктурой, Drizzle, тестами, логированием, health endpoints, CI и документацией. Auth, workspace и бизнес-модули Milestone 02+ запрещены.
 
 ## Завершённые задачи
 
@@ -18,12 +18,16 @@
 - Определён минимальный первый рабочий MVP и явно перечислено, что переносится после него.
 - Создан подробный последовательный план Milestones 00–13.
 - Созданы практические правила работы Codex в корневом `AGENTS.md`.
+- Владелец подтвердил структуру Milestones 00–13 и границу первого MVP Milestones 01–10.
+- Зафиксированы текущие решения C-01–C-15, включая providers-as-adapters, quarantine, approval authority/modes, tenant isolation и completion gate.
+- **Milestone 00 завершён.** Его документы и критерии приёмки утверждены.
 
 ## Текущие задачи
 
-- Ревью документов владельцем продукта.
-- Подтверждение или корректировка решений C-01–C-12 из `docs/DECISIONS.md`.
-- После явной команды на реализацию — начать только Milestone 01.
+- Реализовать и проверить только Milestone 01.
+- Создать pnpm/Turborepo structure, Next.js web, worker foundation и shared packages.
+- Добавить локальные PostgreSQL, Redis, MinIO, Mailpit, Drizzle migration, тесты, CI и точный README.
+- Выполнить обязательные проверки и self-review до объявления Milestone 01 завершённым.
 
 ## Найденные проблемы
 
@@ -39,13 +43,13 @@
 - Нет атомарной связи business transaction → notification queue; предложен outbox.
 - Audit immutability конфликтует с privacy deletion без retention/tombstone policy.
 - Performance targets не имеют фиксированного staging profile и методики.
-- Production domain, jurisdiction, providers и юридический текст не выбраны.
+- Production domain, jurisdiction и финальный юридический текст не выбраны; production providers остаются предварительными.
 
 Подробности и последствия: `docs/DECISIONS.md`, раздел 2.
 
 ## Принятые решения
 
-На текущем шаге решения являются **предложенными**, пока владелец не подтвердил их:
+Текущие решения подтверждены владельцем; инфраструктурные production-кандидаты предварительны:
 
 - TypeScript modular monolith: Next.js web + отдельный BullMQ worker + PostgreSQL.
 - pnpm/Turborepo monorepo; Drizzle ORM; Better Auth с database sessions и hashed magic links.
@@ -54,20 +58,27 @@
 - Transactional outbox для audit/notifications/jobs.
 - Versioned immutable scope/approvals и list-based feedback в MVP; SDK позже.
 - Русский invitation-only MVP без общего чата, оплат, public signup и custom domains.
+- Рабочее имя `Garun Workspace`; домены и URLs только через конфигурацию.
+- Предварительно Vercel web, Railway-compatible worker/PostgreSQL/Redis, Cloudflare R2 и Resend; локально PostgreSQL/Redis/MinIO/Mailpit.
+- 100 MiB/file, 10 GiB/workspace, 30-day deleted-file grace и 90-day technical logs через конфигурацию.
+- `canManageClientMembers` default false; approvals только назначенными клиентами, modes `any_one` default и `all_required`.
+- `recorded_externally` — отдельный audit type, не `ApprovalDecision` клиента.
+- RLS отложен до pre-SaaS review при обязательной application isolation уже сейчас.
+- Completion MVP: stages + no blocking actions + final approval + handover; financial gate только при активных payments.
 
 ## Следующие действия
 
-1. Владелец подтверждает MVP boundary и решения C-01–C-12 либо оставляет правки.
-2. Зафиксировать ответы в `docs/DECISIONS.md` и обновить этот статус.
-3. Получить явную команду начать реализацию.
-4. Создать отдельную рабочую ветку/продолжить утверждённую ветку и выполнить Milestone 01 без расширения scope.
-5. Пройти его quality gate и acceptance criteria до Milestone 02.
+1. Завершить документационный коммит Milestone 00 в planning-ветке.
+2. Создать/продолжить `feat/milestone-01-foundation` без переписывания истории.
+3. Выполнить Milestone 01 без расширения scope.
+4. Пройти его quality gate, Docker/service smoke, migration и self-review.
+5. Обновить этот файл фактическими результатами. Milestone 02 не начинать.
 
 ## Известные ограничения
 
-- В репозитории пока нет исходного кода, package scripts, схемы БД, CI или окружения; команды будущих milestones ещё не существуют.
+- До завершения текущей работы в репозитории нет исходного foundation-кода; фактические результаты будут записаны после проверок Milestone 01.
 - Стек указан на уровне рекомендуемых stable major/minor; точные версии будут зафиксированы lockfile только в Milestone 01.
-- Production deployment заблокирован до выбора юрисдикции/region, hosting, storage/scanner, email domain/provider, retention и утверждённого текста согласования.
+- Production deployment заблокирован до выбора юрисдикции/region, создания approved accounts/secrets, sender domain, scanner deployment и утверждённого текста согласования. Предварительные providers не означают покупку или provisioning.
 - Юридическая достаточность privacy/approval текстов не подтверждается техническим анализом и требует профильной проверки.
 - Оценка сроков и бюджета не дана: она зависит от подтверждённого MVP, provider choices и доступности staging/production аккаунтов.
 - Feedback SDK, payments, change requests, Telegram и integrations сохранены в плане, но намеренно не входят в первый MVP.

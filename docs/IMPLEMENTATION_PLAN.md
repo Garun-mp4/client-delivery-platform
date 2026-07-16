@@ -1,6 +1,6 @@
 # Поэтапный план разработки Client Delivery Platform
 
-Статус: proposed
+Статус: принят владельцем продукта; Milestones 01–10 подтверждены как первый рабочий MVP
 Дата: 2026-07-16
 Источник требований: `PROJECT_SPEC.md`
 Архитектурные решения: `docs/DECISIONS.md`
@@ -64,19 +64,19 @@ Milestones 01–10 образуют первый рабочий MVP. Milestones 
 
 **Цель.** Получить минимальное приложение и worker, которые воспроизводимо запускаются локально и проходят CI.
 
-**Функции.** pnpm/Turborepo; Next.js shell на русском; health/readiness endpoints; worker health; env validation; базовые design tokens и доступные компоненты; structured logger с redaction; единый error envelope/request ID; Docker Compose для PostgreSQL, Redis, MinIO и тестовых сервисов; CI quality gates.
+**Функции.** pnpm/Turborepo; Next.js shell на русском; health/readiness endpoints; worker health; env validation; базовые design tokens и доступные компоненты; structured logger с redaction; единый error envelope/request ID; Docker Compose для PostgreSQL, Redis, MinIO и Mailpit; CI quality gates. Product name, public URLs, environment names, provider endpoints, limits и retention defaults задаются конфигурацией без production secrets.
 
 **Модули и файлы.** Корневые `package.json`, `pnpm-workspace.yaml`, `turbo.json`, lockfile; `apps/web`, `apps/worker`; `packages/config`, `packages/contracts`, `packages/ui`, `packages/observability`, `packages/db`; `infra/compose.yaml`; `.github/workflows/ci.yml`; `.env.example`; README и local setup.
 
 **База данных.** Пустая initial migration с migration journal; служебная проверка соединения. Production schema ещё нет.
 
-**Безопасность.** Fail-fast env schema; секреты только через environment/secret store; `.env*` игнорируются кроме `.env.example`; CSP baseline, security headers, generic production errors; логи проходят redaction tests.
+**Безопасность.** Fail-fast env schema; секреты только через environment/secret store; `.env*` игнорируются кроме package-level `.env.example`; домены не hardcode; CSP baseline, security headers, generic production errors; логи проходят redaction tests. Предварительные Vercel/Railway/R2/Resend настройки не создают production resources и не требуют реальных credentials.
 
 **Тесты.** Unit для env/error/redaction; integration smoke PostgreSQL/Redis/S3; component smoke UI; build и health smoke.
 
 **Команды проверки.** `corepack enable`; `pnpm install --frozen-lockfile`; `docker compose -f infra/compose.yaml up -d`; `pnpm db:migrate`; `pnpm lint`; `pnpm typecheck`; `pnpm test`; `pnpm test:integration`; `pnpm build`; `pnpm smoke`.
 
-**Критерии приёмки.** Новый checkout поднимается по README; web и worker healthy; все команды зелёные в CI; отсутствуют hardcoded secrets; Russian shell корректен на mobile/desktop; production build не требует dev-only env.
+**Критерии приёмки.** Новый checkout поднимается по README; web и worker healthy; PostgreSQL/Redis/MinIO/Mailpit доступны локально; все команды зелёные в CI; отсутствуют hardcoded domain/secrets; Russian shell корректен на mobile/desktop; production build не требует dev-only service credentials.
 
 **Зависимости.** Milestone 00 и подтверждение базового стека.
 
@@ -134,15 +134,15 @@ Milestones 01–10 образуют первый рабочий MVP. Milestones 
 
 **Модули и файлы.** `projects/scope`, `stages`, `actions`, dashboard queries; policy/state-machine files; scope/stage/action screens; dashboard aggregate read model.
 
-**База данных.** `ProjectScopeRevision` с недостающими contract/cost/date links; `ProjectStage`; `ActionItem`; revision uniqueness; positive weights; status checks; indexes по assignee/due/status; audit/outbox events. Scope agreement временно использует approval primitive ограниченного типа, который Milestone 08 обобщит без изменения данных.
+**База данных.** `ProjectScopeRevision` с недостающими contract/cost/date links; `ProjectStage`; `ActionItem`; revision uniqueness; positive integer weights; status checks; indexes по assignee/due/status; audit/outbox events. Scope agreement использует минимальный общий approval primitive с явным назначенным client approver и `any_one`, который Milestone 08 расширит без подмены уже записанных решений.
 
 **Безопасность.** Только уполномоченный главный клиент подтверждает scope; agreed revision immutable; internal actions/criteria фильтруются DTO; status transitions только service methods; due dates/timezone нормализованы; dashboard queries tenant-scoped и не принимают owner ID от клиента.
 
-**Тесты.** Unit stage/project state machines, progress/skipped/zero-edge rules, blockedByClient, overdue/date timezone, next-action ranking; integration scope revision concurrency, dashboard aggregates, immutable agreed scope; permission/tenant tests; E2E create scope → client agrees → stage/action → client completes action.
+**Тесты.** Unit stage/project state machines, точной формулы progress, skipped/zero/reopen edge rules, blockedByClient, overdue/date timezone, next-action ranking; integration scope revision concurrency, assigned approver, dashboard aggregates, immutable agreed scope; permission/tenant tests; E2E create scope → назначенный клиент agrees → stage/action → client completes action.
 
 **Команды проверки.** Standard quality gate; `pnpm test -- state-machine progress policies`; `pnpm test:integration -- dashboard scope`; `pnpm test:e2e --grep "scope|next action"`.
 
-**Критерии приёмки.** Agreed scope нельзя изменить; новая правка создаёт revision; проект не завершается при незавершённом обязательном этапе; dashboard ссылается на причину блокировки; клиент на телефоне понимает единственное следующее действие; прогресс одинаков после refresh/recalculation.
+**Критерии приёмки.** Agreed scope нельзя изменить; новая правка создаёт revision; scope принимает только назначенный client approver; проект не завершается при незавершённом обязательном этапе; dashboard ссылается на причину блокировки; клиент на телефоне понимает единственное следующее действие. Прогресс: сумма весов `approved` и `skipped` с причиной делится на сумму положительных весов всех учитываемых этапов; без этапов 0%; reopen уменьшает прогресс; клиент видит округлённое целое; transaction projection и recalculation совпадают.
 
 **Зависимости.** Milestone 03.
 
@@ -174,13 +174,13 @@ Milestones 01–10 образуют первый рабочий MVP. Milestones 
 
 **Цель.** Полностью заменить разрозненную передачу материалов приватным versioned workflow.
 
-**Функции.** Material request/status/revisions; action+notification outbox при запросе; upload с телефона, multi-upload/progress; image/PDF preview; категории/связи; replace/current/final; quarantine scan; signed download; cleanup incomplete uploads; поиск по metadata; developer accept/clarify.
+**Функции.** Material request/status/revisions; action+transactional notification outbox при запросе; upload с телефона, multi-upload/progress; image/PDF preview; категории/связи; replace/current/final; `quarantine/pending` scan через заменяемый ClamAV-compatible adapter; signed download; cleanup incomplete uploads; поиск по metadata; developer accept/clarify. Defaults 100 MiB/file и 10 GiB/workspace берутся из конфигурации/будущего тарифа.
 
 **Модули и файлы.** `materials`, `files`; `packages/storage`; upload/download Route Handlers; worker scan/preview/cleanup jobs; mobile uploader; material screens.
 
 **База данных.** `Material`, `MaterialRevision`, `FileObject`, `FileLink`; explicit `workspaceId/projectId`, upload state, scan engine/result timestamps, checksum, version/current constraints; indexes; outbox/job idempotency records.
 
-**Безопасность.** MIME sniffing плюс allowlist, extension not trusted; normalized display name; random storage key; size/quota enforcement before and after upload; private bucket; no HTML inline; Content-Disposition attachment; download re-authorized; short TTL; scan required in production; EXIF policy documented; zip bombs/oversize rejected.
+**Безопасность.** MIME sniffing плюс allowlist, extension not trusted; normalized display name; random storage key; size/quota enforcement before and after upload; private bucket; no HTML inline; Content-Disposition attachment; download re-authorized; short TTL. Клиент не получает metadata/download до `available`; `quarantine/pending` и `scanning` недоступны. Scan required in production; EXIF policy documented; zip bombs/oversize rejected; scanner/provider заменяемы.
 
 **Тесты.** Unit file policy/names/quota/state; integration presigned lifecycle, forged target/project, expired link, forbidden MIME, scan fail, replace atomicity, cleanup idempotency, cross-tenant download; E2E mobile upload/replace/accept; storage failure degradation.
 
@@ -196,7 +196,7 @@ Milestones 01–10 образуют первый рабочий MVP. Milestones 
 
 **Цель.** Разработчик публикует проверяемый результат, клиент оставляет и закрывает структурированные замечания без SDK.
 
-**Функции.** Project updates/feed/pin/visibility; SiteVersion с URL, changelog, check instructions, environment, old versions; async safe URL check; open new tab/iframe capability UX; list-based FeedbackItem с page URL, optional screenshot and status flow; comments/replies, edit marker/tombstone/internal visibility; convert marker flag `potential_change`; review action.
+**Функции.** Project updates/feed/pin/visibility; SiteVersion с URL, changelog, check instructions, environment, old versions; async safe URL check до client publication; open new tab/iframe capability UX. `FeedbackItem` — отдельное замечание с page URL, optional screenshot, priority/assignee/status flow; `Comment` — только сообщение/ответ в контексте объекта, без самостоятельного workflow; edit marker/tombstone/internal visibility; feedback classification `potential_change`; review action.
 
 **Модули и файлы.** `updates`, `versions`, `feedback`, `comments`; SSRF-safe URL checker package/worker; project feeds, version/review screens; screenshot attachment через file subsystem.
 
@@ -208,7 +208,7 @@ Milestones 01–10 образуют первый рабочий MVP. Milestones 
 
 **Команды проверки.** Standard quality gate; `pnpm test:security -- ssrf comments`; `pnpm test:integration -- versions feedback`; `pnpm test:e2e --grep "version review"`.
 
-**Критерии приёмки.** Нельзя незаметно заменить URL опубликованной версии; unsafe URL никогда не fetch/publish; старая версия доступна согласно правам; client не видит internal reply; закрытие замечания требует допустимого перехода; review работает без iframe и SDK.
+**Критерии приёмки.** Version создаётся как `pending_check`; SSRF security result отделён от availability result; unsafe URL никогда не fetch/publish и не допускает override; client publication возможна только после safe result (`safe/reachable` либо явно отмеченное `safe_but_unreachable` для защищённого preview). Нельзя незаметно заменить URL; старая версия доступна согласно правам; comment не меняет feedback status; client не видит internal reply; закрытие замечания требует допустимого перехода; review работает без iframe и SDK.
 
 **Зависимости.** Milestone 06.
 
@@ -218,19 +218,19 @@ Milestones 01–10 образуют первый рабочий MVP. Milestones 
 
 **Цель.** Неизменяемо подтвердить конкретный scope/stage/version/file/final handover с правильной authority и конкурентностью.
 
-**Функции.** ApprovalRequest; assigned approvers; `primary_approver`, `any_one`, `all_required`; approve/request changes confirmation; blocking feedback policy; outstanding decision UI; cancel/new request; scope primitive мигрирует на общий workflow; client-safe activity history; audit filters.
+**Функции.** ApprovalRequest; явные assigned approvers; `any_one` (default MVP) и `all_required`; approve/request changes confirmation; blocking feedback policy; outstanding decision UI; cancel/new request; отдельный `recorded_externally`; scope primitive расширяется до общего workflow; client-safe activity history; audit filters.
 
 **Модули и файлы.** `approvals`, `audit`; policies/state machine; approval pages and confirmation dialog; entity snapshot builder/checksum; activity projections.
 
-**База данных.** `ApprovalRequest`, `ApprovalRequestApprover`, `ApprovalDecision`; entity revision/snapshot metadata, acknowledgement snapshot, protected IP representation, user agent; unique decision per approver/request; active-request and concurrency constraints; audit indexes.
+**База данных.** `ApprovalRequest`, `ApprovalRequestApprover`, `ApprovalDecision`; отдельный `ExternalDecisionRecord`/audit event с source, sourceDecisionAt, recordedByUserId и explanation; entity revision/snapshot metadata, configurable acknowledgement template snapshot, protected IP representation, user agent; unique decision per approver/request; active-request and concurrency constraints; audit indexes.
 
-**Безопасность.** Только назначенный approver с текущим project access; decision transaction uses row lock/serializable guard and idempotency key; stale revision blocked; no owner impersonation; sensitive request metadata encrypted/HMAC per retention; client activity allowlist; audit has no app update/delete path.
+**Безопасность.** Только назначенный client approver с текущим project access; `canManageClientMembers` отдельно и default false; decision transaction uses row lock/serializable guard and idempotency key; stale revision blocked; no owner impersonation. Owner может cancel с причиной, создать новый request или записать отдельный `recorded_externally`, который нельзя представить как client action. Sensitive request metadata encrypted/HMAC per retention; client activity allowlist; audit has no app update/delete path; UI не называет решение юридически значимой ЭП.
 
 **Тесты.** Unit strategies, blocking rules, stale revision, state errors; integration double click/concurrent approvers, revoke access before decision, atomic stage transition, immutable decision/cancel event, client audit filtering; E2E request → inspect artifacts → approve/request changes; security IDOR.
 
 **Команды проверки.** Standard quality gate; `pnpm test -- approvals`; `pnpm test:integration -- approvals audit concurrency`; `pnpm test:security -- approvals`; `pnpm test:e2e --grep "approval"`.
 
-**Критерии приёмки.** Повторный/конкурентный запрос не создаёт второе решение; решение содержит точную revision и текст подтверждения; owner не может принять его за клиента; новая обязательная revision инвалидирует старое pending решение; история не раскрывает internal event.
+**Критерии приёмки.** В `any_one` первое допустимое решение завершает request; в `all_required` ожидаются все назначенные пользователи. Повторный/конкурентный запрос не создаёт второе решение; решение содержит точную revision и snapshot настраиваемого нейтрального текста; owner не может принять его за клиента; `recorded_externally` явно показывает автора фиксации и источник; новая обязательная revision инвалидирует старое pending решение; история не раскрывает internal event.
 
 **Зависимости.** Milestone 07.
 
@@ -252,7 +252,7 @@ Milestones 01–10 образуют первый рабочий MVP. Milestones 
 
 **Команды проверки.** Standard quality gate; `pnpm test:integration -- outbox notifications archive`; `pnpm test:e2e --grep "notification|archive|complete"`; `pnpm worker:smoke`.
 
-**Критерии приёмки.** Бизнес-операция успешна при outage email; событие позже доставляется ровно в видимом для пользователя экземпляре; reminder прекращается; unauthorized deep link безопасен; архив read-only; обязательные этапы/передача блокируют premature completion.
+**Критерии приёмки.** Бизнес-операция успешна при outage email; transactional outbox сохраняется с business mutation; событие позже доставляется ровно в видимом для пользователя экземпляре; reminder прекращается; unauthorized deep link безопасен; архив read-only. Completion разрешён только при `approved`/обоснованно `skipped` обязательных этапах, отсутствии blocking actions, принятом final approval и выполненном handover checklist. Payment gate действует лишь при включённом payment-модуле и обязательном unpaid milestone.
 
 **Зависимости.** Milestone 08; production domain/email provider для реальной доставки.
 
@@ -356,7 +356,7 @@ Milestones 01–10 образуют первый рабочий MVP. Milestones 
 | Questionnaire, conditional/repeating, autosave/revisions | 05 |
 | Materials, files, signed URLs, versions, scan | 06 |
 | Updates, SiteVersion, normal feedback/comments | 07 |
-| Approval strategies, immutable decisions, audit | 08 |
+| Assigned approvers, `any_one`/`all_required`, external records, immutable decisions, audit | 08 |
 | In-app/email/reminders, completion/archive | 09 |
 | Export, handover, security/a11y/performance/ops | 10 |
 | Change requests, payments, templates, Telegram | 11 |
