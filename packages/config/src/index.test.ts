@@ -31,6 +31,8 @@ describe('runtime configuration', () => {
         DATABASE_URL: 'postgresql://database.example.test/app',
         PUBLIC_APP_URL: 'http://app.example.test',
         REDIS_URL: 'rediss://redis.example.test',
+        BETTER_AUTH_SECRET: 'test-secret-at-least-32-characters-long',
+        OUTBOX_ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
       }),
     ).toThrow(/PUBLIC_APP_URL/);
   });

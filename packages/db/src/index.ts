@@ -34,4 +34,4 @@ export async function checkDatabase(databaseUrl?: string): Promise<void> {
   }
 }
 
-export { systemMetadata } from './schema';
+export * from './schema';

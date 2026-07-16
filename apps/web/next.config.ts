@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   transpilePackages: [
     '@garun/config',
+    '@garun/auth',
+    '@garun/core',
     '@garun/contracts',
     '@garun/db',
     '@garun/observability',

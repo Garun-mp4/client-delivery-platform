@@ -19,7 +19,8 @@
     "test:e2e": "turbo run test:e2e",
     "db:generate": "turbo run db:generate --filter=@garun/db",
     "db:migrate": "turbo run db:migrate --filter=@garun/db",
-    "smoke": "turbo run smoke"
+    "smoke": "turbo run smoke",
+    "bootstrap:owner": "pnpm --filter @garun/auth bootstrap:owner"
   },
   "devDependencies": {
     "turbo": "2.10.5"

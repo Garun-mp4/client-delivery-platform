@@ -13,6 +13,11 @@
         "DELETED_FILE_GRACE_DAYS",
         "FILE_MAX_BYTES",
         "PUBLIC_APP_URL",
+        "BETTER_AUTH_SECRET",
+        "AUTH_COOKIE_PREFIX",
+        "INVITATION_TTL_HOURS",
+        "MAGIC_LINK_TTL_SECONDS",
+        "OUTBOX_ENCRYPTION_KEY",
         "TECHNICAL_LOG_RETENTION_DAYS",
         "WORKSPACE_QUOTA_BYTES"
       ],
@@ -28,6 +33,15 @@
         "FILE_MAX_BYTES",
         "LOG_LEVEL",
         "PUBLIC_APP_URL",
+        "BETTER_AUTH_SECRET",
+        "AUTH_COOKIE_PREFIX",
+        "INVITATION_TTL_HOURS",
+        "MAGIC_LINK_TTL_SECONDS",
+        "OUTBOX_ENCRYPTION_KEY",
+        "EMAIL_FROM",
+        "SMTP_HOST",
+        "SMTP_PORT",
+        "SMTP_SECURE",
         "REDIS_URL",
         "TECHNICAL_LOG_RETENTION_DAYS",
         "WORKER_HOST",
@@ -67,7 +81,21 @@
     },
     "test:e2e": {
       "cache": false,
-      "env": ["CI", "WEB_BASE_URL", "WEB_SERVER_PORT"]
+      "env": [
+        "CI",
+        "WEB_BASE_URL",
+        "WEB_SERVER_PORT",
+        "DATABASE_URL",
+        "REDIS_URL",
+        "BETTER_AUTH_SECRET",
+        "OUTBOX_ENCRYPTION_KEY",
+        "EMAIL_FROM",
+        "SMTP_HOST",
+        "SMTP_PORT",
+        "SMTP_SECURE",
+        "E2E_OWNER_EMAIL",
+        "E2E_OWNER_PASSWORD"
+      ]
     },
     "db:generate": {
       "cache": false,
