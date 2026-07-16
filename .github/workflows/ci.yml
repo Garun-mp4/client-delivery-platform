@@ -76,7 +76,7 @@ jobs:
       - name: Start local dependencies
         run: |
           cp infra/.env.example infra/.env
-          docker compose -f infra/compose.yaml up -d --wait
+          docker compose -f infra/compose.yaml up -d --wait postgres redis minio mailpit
 
       - name: Apply migrations
         run: pnpm db:migrate

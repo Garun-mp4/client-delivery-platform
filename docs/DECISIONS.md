@@ -228,6 +228,12 @@
 **Альтернативы:** два последовательных письма; превращение invitation token непосредственно в самописную session; автоматический redirect во внешний webmail.
 **Причина:** один клик заметно снижает трение клиента, при этом session создаётся Better Auth, одноразовые secrets остаются hashed, а фиксированный allowlist webmail URL исключает open redirect.
 
+### ADR-026. Единый локальный Compose stack
+
+**Решение:** корневой `compose.yaml` является единственной пользовательской точкой запуска и включает полный локальный stack из `infra/compose.yaml`: PostgreSQL, Redis, MinIO, Mailpit, одноразовый migration service, web и worker. Web/worker используют один общий development image на Node.js 22.22.2/pnpm 11.9.0 и запускаются без root. Migrations завершаются успешно до старта приложений; зависимости и приложения имеют healthchecks; порты публикуются только на loopback; существующее Compose project name и именованные volumes сохраняются. Входные connection strings/secrets имеют Compose-specific `APP_` names, чтобы случайные host env не подменяли container DNS. CI запускает только четыре infrastructure services, поэтому containerized developer flow не дублирует CI host build.
+**Альтернативы:** три ручных терминала; установка host Node/pnpm как обязательное условие просмотра; отдельные Compose-файлы для каждого процесса; production-like multi-stage images уже в Milestone 02.
+**Причина:** одна команда снижает стоимость локального запуска и не меняет production deployment architecture; общий dev image избегает преждевременной упаковки Vercel web и отдельного worker runtime.
+
 ## 5. Планируемая структура репозитория
 
 Каталоги создаются по мере появления рабочего кода, а не пустым scaffold заранее.

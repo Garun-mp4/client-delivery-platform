@@ -1,5 +1,22 @@
 name: garun-workspace-local
 
+x-application-environment: &application-environment
+  APP_ENV: local
+  APP_NAME: ${APP_NAME:?Copy infra/.env.example to infra/.env}
+  PUBLIC_APP_URL: ${PUBLIC_APP_URL:?Copy infra/.env.example to infra/.env}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  DATABASE_URL: ${APP_DATABASE_URL:?Copy infra/.env.example to infra/.env}
+  REDIS_URL: ${APP_REDIS_URL:?Copy infra/.env.example to infra/.env}
+  BETTER_AUTH_SECRET: ${APP_BETTER_AUTH_SECRET:?Copy infra/.env.example to infra/.env}
+  AUTH_COOKIE_PREFIX: ${AUTH_COOKIE_PREFIX:-garun}
+  INVITATION_TTL_HOURS: ${INVITATION_TTL_HOURS:-72}
+  MAGIC_LINK_TTL_SECONDS: ${MAGIC_LINK_TTL_SECONDS:-900}
+  OUTBOX_ENCRYPTION_KEY: ${APP_OUTBOX_ENCRYPTION_KEY:?Copy infra/.env.example to infra/.env}
+  FILE_MAX_BYTES: ${FILE_MAX_BYTES:-104857600}
+  WORKSPACE_QUOTA_BYTES: ${WORKSPACE_QUOTA_BYTES:-10737418240}
+  DELETED_FILE_GRACE_DAYS: ${DELETED_FILE_GRACE_DAYS:-30}
+  TECHNICAL_LOG_RETENTION_DAYS: ${TECHNICAL_LOG_RETENTION_DAYS:-90}
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -75,6 +92,85 @@ services:
       - '127.0.0.1:8025:8025'
     volumes:
       - mailpit_data:/data
+
+  migrate:
+    image: garun-workspace-local-app:dev
+    pull_policy: never
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.local
+    command: ['pnpm', 'db:migrate']
+    environment:
+      DATABASE_URL: ${APP_DATABASE_URL:?Copy infra/.env.example to infra/.env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  web:
+    image: garun-workspace-local-app:dev
+    pull_policy: never
+    command: ['pnpm', '--filter', '@garun/web', 'exec', 'next', 'dev', '--hostname', '0.0.0.0']
+    environment: *application-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/api/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+    ports:
+      - '127.0.0.1:3000:3000'
+    restart: unless-stopped
+
+  worker:
+    image: garun-workspace-local-app:dev
+    pull_policy: never
+    command: ['pnpm', '--filter', '@garun/worker', 'exec', 'tsx', 'watch', 'src/index.ts']
+    environment:
+      <<: *application-environment
+      EMAIL_FROM: ${EMAIL_FROM:?Copy infra/.env.example to infra/.env}
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_SECURE: 'false'
+      WORKER_HOST: 0.0.0.0
+      WORKER_PORT: 3001
+    depends_on:
+      mailpit:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3001/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+    ports:
+      - '127.0.0.1:3001:3001'
+    restart: unless-stopped
 
 volumes:
   mailpit_data:

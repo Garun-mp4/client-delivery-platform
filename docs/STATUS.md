@@ -19,6 +19,7 @@
 - Worker отправляет Mailpit/SMTP email, использует stable Message-ID, bounded retry/backoff, stale-claim recovery и tenant-scoped recipient lookup.
 - Реализованы own session list/revoke/logout, owner revoke member sessions и membership disable с немедленным session revoke.
 - Добавлены русскоязычные mobile-friendly страницы login, sent, invitation states, access denied и минимальный workspace access UI.
+- Полный локальный stack запускается одной командой `docker compose up -d --build --wait`: migrations, web и worker зависят от healthchecks PostgreSQL/Redis/Mailpit, работают в общем non-root development image и сохраняют прежние volumes.
 - Добавлены unit, PostgreSQL integration, tenant/IDOR/security, desktop E2E и accessibility tests. Полный E2E проходит bootstrap → owner magic login → invitation email → одношаговое acceptance с session → owner denial → session/logout.
 - Миграции `0001_robust_nova.sql` и `0002_yielding_micromax.sql` применены на чистой PostgreSQL 17 базе и безопасно запущены повторно; drift отсутствует.
 
@@ -46,6 +47,15 @@
 - ADR-023: Milestone 02 использует encrypted PostgreSQL outbox с прямым worker polling; BullMQ отложен до появления оправданной очереди.
 - ADR-024 сохранён как история первоначального решения и заменён ADR-025.
 - ADR-025 заменяет ADR-024 для пользовательского flow: отдельный verification proof потребляется server-side, поэтому invitation acceptance сразу открывает workspace без второго письма.
+- ADR-026: корневой Compose — единая точка локального запуска полного stack; CI по-прежнему поднимает только infrastructure services.
+
+## Выполненные проверки
+
+- `docker compose up -d --build --wait` собрал общий image, применил migrations и дождался healthy web, worker, PostgreSQL, Redis, MinIO и Mailpit; migration service завершился с кодом 0.
+- `docker compose down` → `docker compose up -d --wait` повторно поднял stack за 19 секунд без удаления named volumes; существующий owner сохранился.
+- Container runtime проверен как non-root UID 1000; Compose logs не содержат настроенных локальных secret values; host `DATABASE_URL` не подменяет container service URL.
+- `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:integration` (10/10), `pnpm build`, `pnpm verify:artifacts`, `pnpm test:e2e` (13/13), повторный `pnpm smoke` и `pnpm audit --prod` прошли.
+- Первый smoke сразу после параллельного E2E попал в пятосекундный timeout во время dev-компиляции `/`; readiness оставался healthy, повтор после завершения компиляции прошёл. Production build/E2E этой проблемы не показали.
 
 ## Следующие действия
 

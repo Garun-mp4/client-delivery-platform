@@ -1,0 +1,28 @@
+FROM node:22.22.2-bookworm-slim
+
+ENV PNPM_HOME=/home/node/.local/share/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+
+RUN corepack enable && corepack prepare pnpm@11.9.0 --activate
+
+WORKDIR /workspace
+RUN chown node:node /workspace
+USER node
+
+COPY --chown=node:node package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+COPY --chown=node:node apps/web/package.json apps/web/package.json
+COPY --chown=node:node apps/worker/package.json apps/worker/package.json
+COPY --chown=node:node packages/auth/package.json packages/auth/package.json
+COPY --chown=node:node packages/config/package.json packages/config/package.json
+COPY --chown=node:node packages/contracts/package.json packages/contracts/package.json
+COPY --chown=node:node packages/core/package.json packages/core/package.json
+COPY --chown=node:node packages/db/package.json packages/db/package.json
+COPY --chown=node:node packages/observability/package.json packages/observability/package.json
+COPY --chown=node:node packages/ui/package.json packages/ui/package.json
+COPY --chown=node:node tooling/eslint/package.json tooling/eslint/package.json
+COPY --chown=node:node tooling/integration-tests/package.json tooling/integration-tests/package.json
+COPY --chown=node:node tooling/quality/package.json tooling/quality/package.json
+COPY --chown=node:node tooling/typescript/package.json tooling/typescript/package.json
+RUN pnpm install --frozen-lockfile
+
+COPY --chown=node:node . .
