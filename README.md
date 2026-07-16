@@ -1,8 +1,8 @@
 # Garun Workspace
 
-Инженерная основа Client Delivery Platform. Текущий scope — **Milestone 01**: monorepo, web,
-worker, локальная инфраструктура, миграции, тесты и CI. Авторизация и бизнес-функции ещё не
-реализуются.
+Client Delivery Platform. **Milestone 02** добавляет invitation-only identity, database-backed
+sessions, workspace membership, deny-by-default RBAC, tenant isolation, audit trail и transactional
+email outbox. Клиенты, проекты и другие продуктовые модули ещё не реализуются.
 
 ## Требования
 
@@ -49,6 +49,13 @@ cp packages/db/.env.example packages/db/.env
 
 Файлы `.env` игнорируются Git. Домены, endpoints, лимиты и retention-настройки нельзя переносить
 из примеров в production без отдельного решения.
+
+Замените локальные placeholder `BETTER_AUTH_SECRET` и `OUTBOX_ENCRYPTION_KEY` собственными
+значениями. Ключ outbox должен декодироваться ровно в 32 байта:
+
+```powershell
+node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
+```
 
 ### 2. Установить зависимости
 
@@ -121,6 +128,27 @@ pnpm --filter @garun/worker dev
 - worker liveness: `http://localhost:3001/health/live`;
 - worker readiness: `http://localhost:3001/health/ready`.
 
+### 6. Создать первого владельца
+
+Bootstrap — непубличная CLI-команда. Она не печатает email, password или session token и безопасно
+завершается при повторном запуске для того же workspace owner.
+
+```powershell
+$env:BOOTSTRAP_OWNER_EMAIL = 'owner@example.test'
+$env:BOOTSTRAP_OWNER_NAME = 'Локальный владелец'
+$env:BOOTSTRAP_OWNER_PASSWORD = 'replace-with-local-password-12+'
+$env:BOOTSTRAP_WORKSPACE_NAME = 'Моя студия'
+$env:BOOTSTRAP_WORKSPACE_SLUG = 'my-studio'
+pnpm bootstrap:owner
+```
+
+После bootstrap откройте `http://localhost:3000/login`. Владелец может войти указанным паролем или
+запросить magic link. Письма не уходят наружу: worker доставляет их в Mailpit по адресу
+`http://localhost:8025`.
+
+Чтобы проверить invitation flow, войдите владельцем, укажите email участника, откройте письмо в
+Mailpit, примите приглашение и затем откройте второе письмо с одноразовой ссылкой для входа.
+
 Health endpoints возвращают только service/check status и correlation ID. Connection strings,
 credentials и тексты ошибок зависимостей в ответ не включаются.
 
@@ -157,7 +185,7 @@ pnpm test:integration
 ```
 
 Playwright использует установленный системный Google Chrome и запускает отдельный production web
-server на `127.0.0.1:3100` из готового build. Уже запущенный dev-server на порту 3000 не
+server на `localhost:3100` и worker из готового build. Уже запущенный dev-server на порту 3000 не
 переиспользуется. Отдельный браузерный binary не скачивается:
 
 ```powershell
@@ -189,15 +217,16 @@ apps/
   web/                  Next.js application и HTTP health endpoints
   worker/               отдельный Node.js worker process и health server
 packages/
+  auth/                 Better Auth composition, invitation service и encrypted outbox
   config/               runtime validation и конфигурируемые defaults
   contracts/            transport DTO/error/health contracts
-  core/                 граница модульного монолита
+  core/                 identity primitives, RBAC policies и TenantContext
   db/                   Drizzle schema, client и migrations
   observability/        Pino logger, redaction, correlation IDs
   ui/                   базовые доступные UI-компоненты
 tooling/
   eslint/               единые flat ESLint configs
-  integration-tests/    проверки PostgreSQL/Redis/MinIO/Mailpit
+  integration-tests/    infrastructure, auth, invitation и tenant-isolation tests
   quality/              repository formatting task
   typescript/           единые strict TypeScript configs
 infra/
@@ -213,6 +242,8 @@ docs/                   решения, план и статус
 - Не коммитьте `.env`, tokens, passwords, magic links и production endpoints.
 - `.env.example` содержит только явно локальные placeholder-значения.
 - `workspaceId` из будущего клиентского запроса никогда не будет доверенным tenant context.
+- Защищённый workspace разрешается только через session → active membership → server policy.
+- Raw invitation/magic tokens не хранятся в БД, audit или structured logs.
 - Логи используют структурированный JSON и redact известные credential fields.
 - Локальный Mailpit не пересылает письма во внешние сервисы.
 - MinIO, PostgreSQL и Redis слушают только loopback host.
@@ -223,4 +254,5 @@ docs/                   решения, план и статус
 - `docs/IMPLEMENTATION_PLAN.md` — принятая последовательность milestones;
 - `docs/DECISIONS.md` — текущие архитектурные решения;
 - `docs/STATUS.md` — фактическое состояние реализации;
+- `docs/IDENTITY_AND_TENANCY.md` — auth/invitation flows, permissions matrix и ER diagram;
 - `AGENTS.md` — правила работы Codex.
