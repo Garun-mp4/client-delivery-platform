@@ -1,0 +1,12 @@
+{
+  "name": "@garun/repository-quality",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "format": "prettier --write ../.. --ignore-path ../../.prettierignore",
+    "format:check": "prettier --check ../.. --ignore-path ../../.prettierignore"
+  },
+  "devDependencies": {
+    "prettier": "catalog:"
+  }
+}

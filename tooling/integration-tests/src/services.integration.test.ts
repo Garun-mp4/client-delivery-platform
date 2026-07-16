@@ -1,0 +1,58 @@
+import { S3Client, ListBucketsCommand } from '@aws-sdk/client-s3';
+import Redis from 'ioredis';
+import { Pool } from 'pg';
+import { afterAll, describe, expect, it } from 'vitest';
+
+function requireEnvironment(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`${name} is required for integration tests.`);
+  }
+  return value;
+}
+
+const databaseUrl = requireEnvironment('TEST_DATABASE_URL');
+const redisUrl = requireEnvironment('TEST_REDIS_URL');
+const minioEndpoint = requireEnvironment('TEST_MINIO_ENDPOINT');
+const minioAccessKey = requireEnvironment('TEST_MINIO_ACCESS_KEY');
+const minioSecretKey = requireEnvironment('TEST_MINIO_SECRET_KEY');
+const mailpitUrl = requireEnvironment('TEST_MAILPIT_URL');
+
+const pool = new Pool({ connectionString: databaseUrl });
+const redis = new Redis(redisUrl, { enableOfflineQueue: false, maxRetriesPerRequest: 1 });
+const s3 = new S3Client({
+  endpoint: minioEndpoint,
+  forcePathStyle: true,
+  region: 'us-east-1',
+  credentials: { accessKeyId: minioAccessKey, secretAccessKey: minioSecretKey },
+});
+
+afterAll(async () => {
+  await pool.end();
+  redis.disconnect();
+  s3.destroy();
+});
+
+describe('local infrastructure', () => {
+  it('runs the Drizzle migration in PostgreSQL', async () => {
+    const result = await pool.query<{ table_name: string }>(
+      "select table_name from information_schema.tables where table_schema = 'public' and table_name = 'system_metadata'",
+    );
+    expect(result.rows).toEqual([{ table_name: 'system_metadata' }]);
+  });
+
+  it('accepts authenticated Redis commands', async () => {
+    await expect(redis.ping()).resolves.toBe('PONG');
+  });
+
+  it('exposes an authenticated S3-compatible MinIO API', async () => {
+    const result = await s3.send(new ListBucketsCommand({}));
+    expect(result.$metadata.httpStatusCode).toBe(200);
+  });
+
+  it('exposes the local Mailpit API without sending real email', async () => {
+    const response = await fetch(`${mailpitUrl}/api/v1/info`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('application/json');
+  });
+});

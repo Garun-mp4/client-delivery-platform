@@ -19,22 +19,22 @@
 
 ## 2. Карта релизов
 
-| Milestone | Рабочий результат | Релизная граница |
-|---|---|---|
-| 00 | Утверждённый план и решения | Planning baseline |
-| 01 | Воспроизводимый skeleton и CI | Engineering foundation |
-| 02 | Безопасный вход и tenant isolation | Identity foundation |
-| 03 | Клиенты, проекты, участники и client shell | First shared workspace |
-| 04 | Scope, этапы, действия и dashboards | Project control loop |
-| 05 | Анкеты с autosave и revisions | Information collection loop |
-| 06 | Материалы и безопасные versioned files | Asset collection loop |
-| 07 | Обновления, URL-версии и замечания | Review loop |
-| 08 | Согласования и неизменяемая история | Decision loop |
-| 09 | Уведомления, reminders и архив | End-to-end MVP feature complete |
-| 10 | Export, hardening и pilot readiness | Первый рабочий MVP |
-| 11 | Templates, change requests, payments, search, Telegram | Professional workflow |
-| 12 | Feedback SDK и screenshot marker mode | Visual feedback release |
-| 13 | Интеграции, maintenance и SaaS readiness | Post-MVP expansion |
+| Milestone | Рабочий результат                                      | Релизная граница                |
+| --------- | ------------------------------------------------------ | ------------------------------- |
+| 00        | Утверждённый план и решения                            | Planning baseline               |
+| 01        | Воспроизводимый skeleton и CI                          | Engineering foundation          |
+| 02        | Безопасный вход и tenant isolation                     | Identity foundation             |
+| 03        | Клиенты, проекты, участники и client shell             | First shared workspace          |
+| 04        | Scope, этапы, действия и dashboards                    | Project control loop            |
+| 05        | Анкеты с autosave и revisions                          | Information collection loop     |
+| 06        | Материалы и безопасные versioned files                 | Asset collection loop           |
+| 07        | Обновления, URL-версии и замечания                     | Review loop                     |
+| 08        | Согласования и неизменяемая история                    | Decision loop                   |
+| 09        | Уведомления, reminders и архив                         | End-to-end MVP feature complete |
+| 10        | Export, hardening и pilot readiness                    | Первый рабочий MVP              |
+| 11        | Templates, change requests, payments, search, Telegram | Professional workflow           |
+| 12        | Feedback SDK и screenshot marker mode                  | Visual feedback release         |
+| 13        | Интеграции, maintenance и SaaS readiness               | Post-MVP expansion              |
 
 Milestones 01–10 образуют первый рабочий MVP. Milestones 11–13 сохраняют остальной scope ТЗ и не являются причиной задерживать пилот.
 
@@ -68,13 +68,13 @@ Milestones 01–10 образуют первый рабочий MVP. Milestones 
 
 **Модули и файлы.** Корневые `package.json`, `pnpm-workspace.yaml`, `turbo.json`, lockfile; `apps/web`, `apps/worker`; `packages/config`, `packages/contracts`, `packages/ui`, `packages/observability`, `packages/db`; `infra/compose.yaml`; `.github/workflows/ci.yml`; `.env.example`; README и local setup.
 
-**База данных.** Пустая initial migration с migration journal; служебная проверка соединения. Production schema ещё нет.
+**База данных.** Initial infrastructure migration с migration journal и единственной служебной таблицей `system_metadata`; проверка соединения. Бизнес-схемы ещё нет.
 
 **Безопасность.** Fail-fast env schema; секреты только через environment/secret store; `.env*` игнорируются кроме package-level `.env.example`; домены не hardcode; CSP baseline, security headers, generic production errors; логи проходят redaction tests. Предварительные Vercel/Railway/R2/Resend настройки не создают production resources и не требуют реальных credentials.
 
-**Тесты.** Unit для env/error/redaction; integration smoke PostgreSQL/Redis/S3; component smoke UI; build и health smoke.
+**Тесты.** Unit для env/error/redaction/request ID; integration smoke PostgreSQL migration/Redis/S3/Mailpit; component smoke UI; Playwright desktop/mobile и axe smoke; production build и health smoke.
 
-**Команды проверки.** `corepack enable`; `pnpm install --frozen-lockfile`; `docker compose -f infra/compose.yaml up -d`; `pnpm db:migrate`; `pnpm lint`; `pnpm typecheck`; `pnpm test`; `pnpm test:integration`; `pnpm build`; `pnpm smoke`.
+**Команды проверки.** `corepack enable`; `pnpm install --frozen-lockfile`; `pnpm format:check`; `pnpm lint`; `pnpm typecheck`; `pnpm test`; `docker compose -f infra/compose.yaml up -d --wait`; `pnpm db:migrate`; `pnpm test:integration`; `pnpm build`; `pnpm test:e2e`; запуск production web/worker и `pnpm smoke`.
 
 **Критерии приёмки.** Новый checkout поднимается по README; web и worker healthy; PostgreSQL/Redis/MinIO/Mailpit доступны локально; все команды зелёные в CI; отсутствуют hardcoded domain/secrets; Russian shell корректен на mobile/desktop; production build не требует dev-only service credentials.
 
@@ -348,20 +348,20 @@ Milestones 01–10 образуют первый рабочий MVP. Milestones 
 
 ## 17. Трассировка требований к MVP
 
-| Требование | Milestone |
-|---|---|
-| Auth, magic link, sessions, RBAC, tenant isolation | 02 |
-| Clients, projects, memberships, client layout | 03 |
-| Agreed scope, stages, actions, progress, dashboards | 04 |
-| Questionnaire, conditional/repeating, autosave/revisions | 05 |
-| Materials, files, signed URLs, versions, scan | 06 |
-| Updates, SiteVersion, normal feedback/comments | 07 |
-| Assigned approvers, `any_one`/`all_required`, external records, immutable decisions, audit | 08 |
-| In-app/email/reminders, completion/archive | 09 |
-| Export, handover, security/a11y/performance/ops | 10 |
-| Change requests, payments, templates, Telegram | 11 |
-| Feedback SDK/fallback marker/real-time | 12 |
-| GitHub/Vercel/calendar/provider/maintenance/SaaS | 13 |
+| Требование                                                                                 | Milestone |
+| ------------------------------------------------------------------------------------------ | --------- |
+| Auth, magic link, sessions, RBAC, tenant isolation                                         | 02        |
+| Clients, projects, memberships, client layout                                              | 03        |
+| Agreed scope, stages, actions, progress, dashboards                                        | 04        |
+| Questionnaire, conditional/repeating, autosave/revisions                                   | 05        |
+| Materials, files, signed URLs, versions, scan                                              | 06        |
+| Updates, SiteVersion, normal feedback/comments                                             | 07        |
+| Assigned approvers, `any_one`/`all_required`, external records, immutable decisions, audit | 08        |
+| In-app/email/reminders, completion/archive                                                 | 09        |
+| Export, handover, security/a11y/performance/ops                                            | 10        |
+| Change requests, payments, templates, Telegram                                             | 11        |
+| Feedback SDK/fallback marker/real-time                                                     | 12        |
+| GitHub/Vercel/calendar/provider/maintenance/SaaS                                           | 13        |
 
 ## 18. MVP release gate
 

@@ -1,0 +1,35 @@
+{
+  "name": "@garun/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=.env src/index.ts",
+    "build": "tsup",
+    "start": "node --env-file-if-exists=.env dist/index.js",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@garun/config": "workspace:*",
+    "@garun/contracts": "workspace:*",
+    "@garun/db": "workspace:*",
+    "@garun/observability": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "ioredis": "catalog:",
+    "pg": "catalog:",
+    "pino": "catalog:"
+  },
+  "devDependencies": {
+    "@garun/eslint-config": "workspace:*",
+    "@garun/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "tsup": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
