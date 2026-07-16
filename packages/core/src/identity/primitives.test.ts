@@ -8,6 +8,7 @@ import {
   normalizeEmail,
   safeRelativeRedirect,
   verifyOneTimeToken,
+  webmailProviderForEmail,
 } from './primitives';
 
 describe('identity primitives', () => {
@@ -32,4 +33,10 @@ describe('identity primitives', () => {
   });
   it('masks audit email values', () =>
     expect(maskEmail('owner@example.com')).toBe('o***@example.com'));
+  it('maps only known domains to fixed webmail providers', () => {
+    expect(webmailProviderForEmail(' User@GMAIL.com ')).toBe('gmail');
+    expect(webmailProviderForEmail('user@inbox.ru')).toBe('mailru');
+    expect(webmailProviderForEmail('user@yandex.ru')).toBe('yandex');
+    expect(webmailProviderForEmail('user@company.example')).toBeNull();
+  });
 });

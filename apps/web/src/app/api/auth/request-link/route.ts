@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
-import { normalizeEmail } from '@garun/core/identity';
+import { normalizeEmail, webmailProviderForEmail } from '@garun/core/identity';
 import { auditEvent, user, workspaceMembership } from '@garun/db/schema';
 
 import { auth, database } from '@/lib/server';
@@ -14,9 +14,12 @@ export async function POST(request: Request) {
   const emailValue = form.get('email');
   if (typeof emailValue !== 'string') return NextResponse.json(generic, { status: 202 });
   const email = normalizeEmail(emailValue);
+  const sentUrl = new URL('/login/sent', request.url);
+  const provider = webmailProviderForEmail(email);
+  if (provider) sentUrl.searchParams.set('provider', provider);
   const source = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
   if (!(await allowSensitiveRequest('magic-link', `${source}:${email}`, 5, 300))) {
-    return NextResponse.redirect(new URL('/login/sent', request.url), 303);
+    return NextResponse.redirect(sentUrl, 303);
   }
   const [eligible] = await database.db
     .select({ id: user.id })
@@ -43,5 +46,5 @@ export async function POST(request: Request) {
       requestId: request.headers.get('x-request-id') ?? undefined,
     });
   }
-  return NextResponse.redirect(new URL('/login/sent', request.url), 303);
+  return NextResponse.redirect(sentUrl, 303);
 }

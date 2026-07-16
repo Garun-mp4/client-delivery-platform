@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm';
 import type { WebEnvironment } from '@garun/config';
 import type { DatabaseClient } from '@garun/db';
 import * as schema from '@garun/db/schema';
-import { normalizeEmail } from '@garun/core/identity';
+import { normalizeEmail, safeRelativeRedirect } from '@garun/core/identity';
 
 import { enqueueEmail } from './outbox';
 
@@ -14,6 +14,7 @@ export function createAuth(
   database: DatabaseClient['db'],
   environment: WebEnvironment,
   allowBootstrapSignup = false,
+  deliverMagicLink?: (message: { email: string; url: string }) => Promise<void>,
 ) {
   return betterAuth({
     appName: environment.APP_NAME,
@@ -58,6 +59,10 @@ export function createAuth(
         storeToken: 'hashed',
         rateLimit: { window: 60, max: 5 },
         async sendMagicLink({ email, url }) {
+          if (deliverMagicLink) {
+            await deliverMagicLink({ email: normalizeEmail(email), url });
+            return;
+          }
           const normalizedEmail = normalizeEmail(email);
           const [recipient] = await database
             .select({ id: schema.user.id })
@@ -78,6 +83,34 @@ export function createAuth(
       }),
     ],
   });
+}
+
+export async function createInvitationSessionResponse(
+  database: DatabaseClient['db'],
+  environment: WebEnvironment,
+  input: { email: string; callbackURL: string; headers: Headers },
+) {
+  let verificationUrl: string | undefined;
+  const invitationAuth = createAuth(database, environment, false, async ({ url }) => {
+    verificationUrl = url;
+  });
+  await invitationAuth.api.signInMagicLink({
+    body: {
+      email: normalizeEmail(input.email),
+      callbackURL: safeRelativeRedirect(input.callbackURL),
+      errorCallbackURL: '/login?error=link',
+    },
+    headers: input.headers,
+  });
+  if (!verificationUrl) throw new Error('INVITATION_SESSION_LINK_NOT_CREATED');
+
+  const response = await invitationAuth.handler(
+    new Request(verificationUrl, { headers: input.headers }),
+  );
+  if (response.status < 300 || response.status >= 400 || !response.headers.has('set-cookie')) {
+    throw new Error('INVITATION_SESSION_NOT_CREATED');
+  }
+  return response;
 }
 
 export type GarunAuth = ReturnType<typeof createAuth>;

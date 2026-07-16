@@ -18,7 +18,7 @@
 3. В той же транзакции создаются audit и outbox records. Ссылка находится только в AES-GCM envelope, не в JSON payload.
 4. Worker отправляет письмо через SMTP adapter/Mailpit, очищает encrypted secret после успеха и применяет bounded retry/backoff.
 5. Acceptance блокирует invitation row, повторно проверяет status/expiry, создаёт user и уникальный membership, помечает token использованным и пишет audit в одной транзакции.
-6. После acceptance отправляется отдельный Better Auth magic link. Invitation token сам session не создаёт.
+6. После acceptance сервер выпускает и немедленно потребляет отдельный hashed Better Auth verification token, создаёт database-backed session и перенаправляет участника прямо в workspace. В браузер не отправляется второе письмо; при редком сбое session issuance уже созданный membership позволяет запросить обычный magic link.
 
 ## Permissions matrix
 
@@ -56,7 +56,7 @@ erDiagram
   INVITATION ||--o{ OUTBOX_EVENT : requests
 ```
 
-`verification` принадлежит Better Auth и хранит hashed magic tokens. `rate_limit` поддерживает multi-instance rate limiting Better Auth. Unique constraints запрещают дублирующий membership и два pending invitations на один email/workspace.
+`verification` принадлежит Better Auth и хранит hashed magic tokens, включая короткоживущий token для server-side session issuance после acceptance. `rate_limit` поддерживает multi-instance rate limiting Better Auth. Unique constraints запрещают дублирующий membership и два pending invitations на один email/workspace.
 
 ## Audit allowlist
 

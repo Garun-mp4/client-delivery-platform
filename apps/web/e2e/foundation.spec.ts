@@ -15,6 +15,16 @@ test('login page has no automatically detectable accessibility violations', asyn
   expect(results.violations).toEqual([]);
 });
 
+test('offers only a fixed webmail shortcut for a recognized provider', async ({ page }) => {
+  await page.goto('/login/sent?provider=gmail');
+  const shortcut = page.getByRole('link', { name: 'Открыть Gmail' });
+  await expect(shortcut).toHaveAttribute('href', 'https://mail.google.com/');
+  await expect(shortcut).toHaveAttribute('target', '_blank');
+
+  await page.goto('/login/sent?provider=https://evil.example');
+  await expect(page.getByText(/^Открыть /)).toHaveCount(0);
+});
+
 test('foundation page has no automatically detectable accessibility violations', async ({
   page,
 }) => {

@@ -1,10 +1,10 @@
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
-import { acceptInvitation, InvitationError } from '@garun/auth';
-import { user } from '@garun/db/schema';
+import { acceptInvitation, createInvitationSessionResponse, InvitationError } from '@garun/auth';
+import { user, workspace } from '@garun/db/schema';
 
-import { auth, database } from '@/lib/server';
+import { database, environment } from '@/lib/server';
 import { allowSensitiveRequest } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
@@ -16,31 +16,35 @@ export async function POST(request: Request) {
   if (!(await allowSensitiveRequest('invitation-accept', source, 20, 300))) {
     return NextResponse.redirect(new URL('/invite/invalid', request.url), 303);
   }
+  let accepted: Awaited<ReturnType<typeof acceptInvitation>>;
   try {
-    const accepted = await acceptInvitation(database, token, {
+    accepted = await acceptInvitation(database, token, {
       requestId: request.headers.get('x-request-id') ?? undefined,
     });
-    const [acceptedUser] = await database.db
-      .select({ email: user.email })
-      .from(user)
-      .where(eq(user.id, accepted.userId))
-      .limit(1);
-    if (acceptedUser) {
-      await auth.api.signInMagicLink({
-        body: {
-          email: acceptedUser.email,
-          callbackURL: '/workspace',
-          errorCallbackURL: '/login?error=link',
-        },
-        headers: request.headers,
-      });
-    }
-    return NextResponse.redirect(new URL('/invite/accepted', request.url), 303);
   } catch (error) {
     const path =
       error instanceof InvitationError && error.code === 'INVITATION_EXPIRED'
         ? 'expired'
         : 'invalid';
     return NextResponse.redirect(new URL(`/invite/${path}`, request.url), 303);
+  }
+
+  const [acceptedIdentity] = await database.db
+    .select({ email: user.email, workspaceSlug: workspace.slug })
+    .from(user)
+    .innerJoin(workspace, eq(workspace.id, accepted.workspaceId))
+    .where(eq(user.id, accepted.userId))
+    .limit(1);
+  if (!acceptedIdentity)
+    return NextResponse.redirect(new URL('/invite/accepted', request.url), 303);
+
+  try {
+    return await createInvitationSessionResponse(database.db, environment, {
+      email: acceptedIdentity.email,
+      callbackURL: `/workspace/${acceptedIdentity.workspaceSlug}`,
+      headers: new Headers(request.headers),
+    });
+  } catch {
+    return NextResponse.redirect(new URL('/invite/accepted', request.url), 303);
   }
 }

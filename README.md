@@ -147,7 +147,10 @@ pnpm bootstrap:owner
 `http://localhost:8025`.
 
 Чтобы проверить invitation flow, войдите владельцем, укажите email участника, откройте письмо в
-Mailpit, примите приглашение и затем откройте второе письмо с одноразовой ссылкой для входа.
+Mailpit и примите приглашение. Одна ссылка создаёт membership, безопасную Better Auth session и
+сразу открывает workspace; второе письмо не требуется. Обычный magic link используется для
+последующих входов. Для Gmail, Mail.ru и Яндекс Почты экран ожидания показывает необязательную
+ссылку на соответствующий webmail, не выполняя автоматический redirect.
 
 Health endpoints возвращают только service/check status и correlation ID. Connection strings,
 credentials и тексты ошибок зависимостей в ответ не включаются.

@@ -4,10 +4,13 @@ export default function AcceptedPage() {
     <main className="auth-shell">
       <section className="auth-card">
         <p className="eyebrow">Приглашение принято</p>
-        <h1>Теперь проверьте почту</h1>
-        <p className="lede">Мы отправили отдельную одноразовую ссылку для входа.</p>
+        <h1>Доступ уже создан</h1>
+        <p className="lede">
+          Автоматический вход не завершился. Запросите обычную одноразовую ссылку — повторно
+          принимать приглашение не потребуется.
+        </p>
         <Link className="text-link" href="/login">
-          Перейти ко входу
+          Получить ссылку для входа
         </Link>
       </section>
     </main>

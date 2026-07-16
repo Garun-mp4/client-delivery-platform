@@ -67,11 +67,6 @@ test('owner invites a member and tenant policies deny owner actions to the membe
     invitationMail.link.replace('http://localhost:3000', test.info().project.use.baseURL as string),
   );
   await memberPage.getByRole('button', { name: 'Принять приглашение' }).click();
-  await expect(memberPage.getByRole('heading', { name: 'Теперь проверьте почту' })).toBeVisible();
-  const loginMail = await latestLink(request, memberEmail, invitationMail.id);
-  await memberPage.goto(
-    loginMail.link.replace('http://localhost:3000', test.info().project.use.baseURL as string),
-  );
   await expect(memberPage).toHaveURL(/\/workspace\/e2e-studio/);
   await expect(memberPage.getByRole('heading', { name: 'Пригласить участника' })).toHaveCount(0);
   const directOwnerAction = await memberPage.request.post(

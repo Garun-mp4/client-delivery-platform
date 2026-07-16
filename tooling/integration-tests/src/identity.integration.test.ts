@@ -5,6 +5,7 @@ import {
   acceptInvitation,
   createAuth,
   createInvitation,
+  createInvitationSessionResponse,
   decryptOutboxSecret,
   revokeInvitation,
 } from '@garun/auth';
@@ -181,6 +182,22 @@ describe('identity and tenant isolation', () => {
         ),
       );
     expect(membership?.role).toBe('member');
+    const sessionResponse = await createInvitationSessionResponse(client.db, authEnvironment, {
+      email: memberEmail,
+      callbackURL: `/workspace/a-${suffix}`,
+      headers: new Headers({ origin: authEnvironment.PUBLIC_APP_URL }),
+    });
+    expect(sessionResponse.status).toBeGreaterThanOrEqual(300);
+    expect(sessionResponse.status).toBeLessThan(400);
+    expect(sessionResponse.headers.get('location')).toContain(`/workspace/a-${suffix}`);
+    const cookie = sessionResponse.headers
+      .getSetCookie()
+      .map((value) => value.split(';')[0])
+      .join('; ');
+    const memberSession = await createAuth(client.db, authEnvironment).api.getSession({
+      headers: new Headers({ cookie }),
+    });
+    expect(memberSession?.user.id).toBe(accepted.userId);
     const rejection: Partial<InvitationError> = { code: 'INVITATION_INVALID' };
     await expect(acceptInvitation(client, token)).rejects.toMatchObject(rejection);
     const events = await client.db

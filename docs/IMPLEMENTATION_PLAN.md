@@ -86,7 +86,7 @@ Milestones 01–10 образуют первый рабочий MVP. Milestones 
 
 **Цель.** Безопасно идентифицировать владельца/клиента и гарантировать изоляцию workspace до появления бизнес-функций.
 
-**Функции.** Bootstrap первого owner; workspace profile (name/logo reference/accent); Better Auth database sessions; email+password для owner; invitation-only magic link для клиента; expiration/revoke/single-use; logout, revoke sessions, disable user; onboarding screen; WorkspaceMembership roles/permission schema; server policy layer; rate limits; audit security events.
+**Функции.** Bootstrap первого owner; workspace profile (name/logo reference/accent); Better Auth database sessions; email+password для owner; одношаговое принятие invitation с server-side Better Auth session issuance; обычный magic link для последующих входов; expiration/revoke/single-use; logout, revoke sessions, disable user; onboarding screen; WorkspaceMembership roles/permission schema; server policy layer; rate limits; audit security events.
 
 **Модули и файлы.** `packages/auth`; `packages/core/src/modules/auth`, `workspaces`, `audit`; auth Route Handlers/pages; workspace settings UI; tenant-aware repository helpers; email outbox stub сохраняет событие, но dev transport выводит безопасный preview без токена в лог.
 

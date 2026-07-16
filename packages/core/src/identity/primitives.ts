@@ -34,3 +34,15 @@ export function maskEmail(email: string): string {
   if (!domain) return '***';
   return `${local.slice(0, 1)}***@${domain}`;
 }
+
+export type WebmailProvider = 'gmail' | 'mailru' | 'yandex';
+
+export function webmailProviderForEmail(email: string): WebmailProvider | null {
+  const domain = normalizeEmail(email).split('@').at(1);
+  if (domain === 'gmail.com' || domain === 'googlemail.com') return 'gmail';
+  if (domain && ['mail.ru', 'inbox.ru', 'bk.ru', 'list.ru', 'internet.ru'].includes(domain)) {
+    return 'mailru';
+  }
+  if (domain && ['yandex.ru', 'ya.ru', 'yandex.com'].includes(domain)) return 'yandex';
+  return null;
+}

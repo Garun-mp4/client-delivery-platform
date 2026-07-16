@@ -19,7 +19,7 @@
 - Worker отправляет Mailpit/SMTP email, использует stable Message-ID, bounded retry/backoff, stale-claim recovery и tenant-scoped recipient lookup.
 - Реализованы own session list/revoke/logout, owner revoke member sessions и membership disable с немедленным session revoke.
 - Добавлены русскоязычные mobile-friendly страницы login, sent, invitation states, access denied и минимальный workspace access UI.
-- Добавлены unit, PostgreSQL integration, tenant/IDOR/security, desktop E2E и accessibility tests. Полный E2E проходит bootstrap → magic login → invitation email → acceptance → member login → owner denial → session/logout.
+- Добавлены unit, PostgreSQL integration, tenant/IDOR/security, desktop E2E и accessibility tests. Полный E2E проходит bootstrap → owner magic login → invitation email → одношаговое acceptance с session → owner denial → session/logout.
 - Миграции `0001_robust_nova.sql` и `0002_yielding_micromax.sql` применены на чистой PostgreSQL 17 базе и безопасно запущены повторно; drift отсутствует.
 
 ## Текущие задачи
@@ -44,7 +44,8 @@
 - ADR-021: Better Auth отвечает за identity/session lifecycle, доменные права остаются в policy layer.
 - ADR-022: TenantContext разрешается только из session + active membership + server lookup; client `workspaceId` недоверенный.
 - ADR-023: Milestone 02 использует encrypted PostgreSQL outbox с прямым worker polling; BullMQ отложен до появления оправданной очереди.
-- ADR-024: invitation acceptance и magic login используют два разных single-use proof; project grants отложены до Project entity.
+- ADR-024 сохранён как история первоначального решения и заменён ADR-025.
+- ADR-025 заменяет ADR-024 для пользовательского flow: отдельный verification proof потребляется server-side, поэтому invitation acceptance сразу открывает workspace без второго письма.
 
 ## Следующие действия
 
