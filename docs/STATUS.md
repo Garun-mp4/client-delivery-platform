@@ -35,6 +35,7 @@
 - Direct member invitation request сначала возвращал redirect после policy exception. Owner permission теперь проверяется до mutation и чужой/запрещённый запрос получает одинаковый `404`.
 - Production audit выявил уязвимые версии Nodemailer и транзитивного esbuild; Nodemailer обновлён до 9.0.3, esbuild закреплён на 0.28.1, `pnpm audit --prod` добавлен в CI.
 - E2E global setup раньше зависел от переменных родительского shell, несмотря на подготовленный `apps/web/.env`; setup теперь безопасно загружает локальный env-файл, и документированная команда работает напрямую.
+- Первый branch CI обнаружил, что strict Turbo build env не пропускал `DATABASE_URL` и `REDIS_URL` в Linux Next.js build; обе переменные явно добавлены в build allowlist.
 - Self-review расширил redaction auth/outbox secrets, добавил deny-by-default parsing permission JSON и обязательное подтверждение опасных session/membership/invitation действий.
 - Production deployment, sender domain, Resend credentials и реальные secrets намеренно не создавались.
 
