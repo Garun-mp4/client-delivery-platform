@@ -126,4 +126,76 @@ describe('questionnaire schema and answers', () => {
     expect(() => sanitizeQuestionnaireDraft(schema, { injected: 'value' })).toThrow();
     expect(() => sanitizeQuestionnaireDraft(schema, { site_url: 'x'.repeat(256_001) })).toThrow();
   });
+
+  it('normalizes every scalar field type and reports invalid calendar dates', () => {
+    const scalarSchema: QuestionnaireSchema = {
+      version: 1,
+      sections: [
+        {
+          id: 'details',
+          title: 'Детали',
+          fields: [
+            { id: 'text', type: 'long_text', label: 'Текст', required: true },
+            { id: 'number', type: 'number', label: 'Число', required: true },
+            { id: 'email', type: 'email', label: 'Email', required: true },
+            { id: 'phone', type: 'phone', label: 'Телефон', required: true },
+            {
+              id: 'choice',
+              type: 'single_choice',
+              label: 'Выбор',
+              required: true,
+              options: ['Первый', 'Второй'],
+            },
+            {
+              id: 'choices',
+              type: 'multiple_choice',
+              label: 'Несколько',
+              required: true,
+              options: ['A', 'B'],
+            },
+            { id: 'date', type: 'date', label: 'Дата', required: true },
+            { id: 'toggle', type: 'toggle', label: 'Флаг', required: true },
+          ],
+        },
+      ],
+    };
+    const valid = validateQuestionnaireAnswers(
+      scalarSchema,
+      {
+        text: '  Текст  ',
+        number: '42',
+        email: 'USER@EXAMPLE.COM',
+        phone: '+7 900 000-00-00',
+        choice: 'Первый',
+        choices: ['A', 'A', 'B'],
+        date: '2026-12-31',
+        toggle: false,
+      },
+      { requireComplete: true },
+    );
+    expect(valid.errors).toEqual({});
+    expect(valid.answers).toMatchObject({
+      text: 'Текст',
+      number: 42,
+      email: 'user@example.com',
+      choices: ['A', 'B'],
+      date: '2026-12-31',
+      toggle: false,
+    });
+    const invalid = validateQuestionnaireAnswers(
+      scalarSchema,
+      {
+        text: 'Текст',
+        number: 42,
+        email: 'user@example.com',
+        phone: '+7 900 000-00-00',
+        choice: 'Первый',
+        choices: ['A'],
+        date: '2026-99-99',
+        toggle: true,
+      },
+      { requireComplete: true },
+    );
+    expect(invalid.errors.date).toBe('Проверьте формат значения.');
+  });
 });
