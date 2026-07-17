@@ -32,6 +32,7 @@ test('owner publishes one project and grants then revokes explicit client access
   page,
   request,
 }) => {
+  test.setTimeout(60_000);
   const suffix = `${Date.now()}-${test.info().workerIndex}`;
   const ownerEmail = process.env.E2E_OWNER_EMAIL ?? 'e2e-owner@example.test';
   const ownerPassword = process.env.E2E_OWNER_PASSWORD ?? 'E2eOwnerPassword-2026!';
@@ -73,6 +74,7 @@ test('owner publishes one project and grants then revokes explicit client access
   await page.getByRole('button', { name: 'Опубликовать проект' }).click();
   await expect(page.getByText('Операция выполнена.')).toBeVisible();
   await page.getByLabel('Email клиента').fill(clientEmail);
+  await page.getByLabel('Может согласовывать границы проекта').check();
   await page.getByRole('button', { name: 'Отправить приглашение' }).click();
   await expect(page.getByText(clientEmail)).toBeVisible();
 
@@ -86,6 +88,40 @@ test('owner publishes one project and grants then revokes explicit client access
   await expect(clientPage).toHaveURL(new RegExp(`/projects/${projectSlug}`));
   await expect(clientPage.getByRole('heading', { name: projectName })).toBeVisible();
   await expect(clientPage.getByText(internalNote)).toHaveCount(0);
+
+  await page.getByRole('link', { name: 'План, этапы и действия' }).click();
+  await page.getByLabel('Краткое описание').fill('Разработка публичного сайта компании');
+  await page.getByLabel(/Цели —/).fill('Запустить новый канал продаж');
+  await page.getByLabel(/Страницы —/).fill('Главная\nКаталог');
+  await page.getByLabel(/Результаты —/).fill('Адаптивный сайт');
+  await page.getByLabel(/Критерии приёмки —/).fill('Все страницы открываются без ошибок');
+  await page.getByRole('button', { name: 'Создать версию scope' }).click();
+  await page.getByRole('button', { name: 'Отправить на согласование' }).click();
+
+  await clientPage.goto(`/workspace/e2e-studio/projects/${projectSlug}/workflow`);
+  await expect(
+    clientPage.getByRole('heading', { name: 'Проверьте и согласуйте границы проекта' }),
+  ).toBeVisible();
+  await clientPage.getByRole('button', { name: 'Согласовать версию' }).click();
+  await expect(clientPage.getByText('Изменения сохранены.')).toBeVisible();
+
+  await page.reload();
+  await page.getByLabel('Название этапа').fill('Прототип');
+  await page.getByLabel('Вес прогресса').fill('5');
+  await page.getByLabel('Начало', { exact: true }).fill('2026-09-01');
+  await page.getByLabel('Завершение', { exact: true }).fill('2026-09-10');
+  await page.getByRole('button', { name: 'Добавить этап' }).click();
+  await page.getByLabel('Название действия').fill('Передать логотип');
+  await page.getByLabel('Исполнитель').selectOption({ index: 1 });
+  await page.getByLabel('Видимость').selectOption('client');
+  await page.getByLabel('Срок').fill('2026-09-05');
+  await page.getByLabel('Блокирует дальнейший ход проекта').check();
+  await page.getByRole('button', { name: 'Создать действие' }).click();
+
+  await clientPage.reload();
+  await expect(clientPage.getByRole('heading', { name: 'Передать логотип' })).toBeVisible();
+  await clientPage.getByRole('button', { name: 'Отметить выполненным' }).click();
+  await expect(clientPage.getByText('Изменения сохранены.')).toBeVisible();
 
   const forbiddenCreate = await clientPage.request.post('/api/workspaces/e2e-studio/projects', {
     form: {
@@ -105,7 +141,7 @@ test('owner publishes one project and grants then revokes explicit client access
   const accessibility = await new AxeBuilder({ page: clientPage }).analyze();
   expect(accessibility.violations).toEqual([]);
 
-  await page.reload();
+  await page.goto(`/workspace/e2e-studio/projects/${projectSlug}`);
   await page.getByLabel('Подтверждаю отзыв доступа').check();
   await page.getByRole('button', { name: 'Удалить из проекта' }).click();
   await expect(page.getByText('Операция выполнена.')).toBeVisible();

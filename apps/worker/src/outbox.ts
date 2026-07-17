@@ -8,11 +8,11 @@ interface ClaimedEvent {
   id: string;
   workspaceId: string | null;
   payload: {
-    template: 'workspace-invitation' | 'project-invitation' | 'magic-link';
+    template: 'workspace-invitation' | 'project-invitation' | 'magic-link' | 'domain-event';
     recipientUserId?: string;
     invitationId?: string;
   };
-  encryptedSecret: string;
+  encryptedSecret: string | null;
   attempts: number;
 }
 
@@ -37,7 +37,7 @@ async function claim(pool: Pool): Promise<ClaimedEvent | null> {
     const result = await connection.query<ClaimedEvent>(`
       select id, workspace_id as "workspaceId", payload, encrypted_secret as "encryptedSecret", attempts
       from outbox_event
-      where status = 'pending' and available_at <= now() and encrypted_secret is not null
+      where status = 'pending' and available_at <= now()
       order by created_at
       for update skip locked
       limit 1
@@ -137,16 +137,21 @@ export function startOutboxDispatcher(
       if (!event) return;
       const connection = await pool.connect();
       try {
-        const recipient = await resolveRecipient(connection, event);
-        if (!recipient) throw new Error('RECIPIENT_NOT_FOUND');
-        const link = decryptOutboxSecret(event.encryptedSecret, environment.OUTBOX_ENCRYPTION_KEY);
-        await transport.sendMail({
-          from: environment.EMAIL_FROM,
-          to: recipient.email,
-          subject: recipient.subject,
-          text: `${recipient.text}${link}`,
-          messageId: outboxMessageId(event.id),
-        });
+        if (event.payload.template !== 'domain-event') {
+          const recipient = await resolveRecipient(connection, event);
+          if (!recipient || !event.encryptedSecret) throw new Error('RECIPIENT_NOT_FOUND');
+          const link = decryptOutboxSecret(
+            event.encryptedSecret,
+            environment.OUTBOX_ENCRYPTION_KEY,
+          );
+          await transport.sendMail({
+            from: environment.EMAIL_FROM,
+            to: recipient.email,
+            subject: recipient.subject,
+            text: `${recipient.text}${link}`,
+            messageId: outboxMessageId(event.id),
+          });
+        }
         await connection.query(
           "update outbox_event set status = 'delivered', delivered_at = now(), encrypted_secret = null, locked_at = null, last_error_code = null, updated_at = now() where id = $1",
           [event.id],
@@ -156,7 +161,9 @@ export function startOutboxDispatcher(
       }
       logger.info(
         { outboxEventId: event.id, workspaceId: event.workspaceId },
-        'Outbox email delivered',
+        event.payload.template === 'domain-event'
+          ? 'Outbox domain event acknowledged'
+          : 'Outbox email delivered',
       );
     } catch {
       if (event) {

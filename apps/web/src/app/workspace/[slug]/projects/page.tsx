@@ -6,6 +6,7 @@ import {
   listInternalWorkspaceMembers,
   listProjects,
 } from '@garun/core/projects';
+import { listWorkspaceWorkflowOverview } from '@garun/core/workflow';
 
 import { WorkspaceNav } from '../_components/workspace-nav';
 import { projectStatusLabels, projectTypeLabels } from './project-copy';
@@ -22,11 +23,13 @@ export default async function ProjectsPage({
   const [{ slug }, feedback] = await Promise.all([params, searchParams]);
   const { tenant } = await requireTenantPage(slug);
   const owner = isOwner(tenant);
-  const [projects, companies, members] = await Promise.all([
+  const [projects, companies, members, overview] = await Promise.all([
     listProjects(database.db, tenant),
     listActiveClientCompanies(database.db, tenant),
     listInternalWorkspaceMembers(database.db, tenant),
+    listWorkspaceWorkflowOverview(database.db, tenant),
   ]);
+  const overviewByProject = new Map(overview.map((item) => [item.projectId, item]));
   const internal = owner || projects.some((item) => item.side === 'internal');
   return (
     <main className="workspace-shell">
@@ -74,6 +77,14 @@ export default async function ProjectsPage({
                       new Date(`${item.plannedEndDate}T00:00:00Z`),
                     )}
                   </small>
+                  {internal ? (
+                    <small>
+                      Прогресс {overviewByProject.get(item.id)?.progressPercent ?? 0}%
+                      {overviewByProject.get(item.id)?.blockingAction
+                        ? ` · ожидает клиента: ${overviewByProject.get(item.id)!.blockingAction!.title}`
+                        : ''}
+                    </small>
+                  ) : null}
                 </Link>
               </li>
             ))}
