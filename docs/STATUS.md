@@ -1,76 +1,107 @@
 # Статус реализации
 
-Последнее обновление: 2026-07-16
-Общий статус: Milestones 00–02 завершены
+Последнее обновление: 2026-07-17
+Общий статус: Milestones 00–03 завершены
 
 ## Текущий milestone
 
-**Milestone 02 — identity, workspace, RBAC и tenant isolation — завершён.** Scope ограничен identity, sessions, workspace membership, internal invitations, policies, tenant isolation, audit и transactional email outbox. Milestone 03 не начат.
+**Milestone 03 — клиенты, проекты и участники — завершён.** Реализованы только компании клиентов,
+проекты, явные memberships/grants, публикация, приглашение клиента, tenant policies и минимальные
+внутренний/клиентский интерфейсы. Scope Milestone 04 не начат.
 
 ## Завершённые задачи
 
-- Milestones 00–01 сохранены без изменения принятых границ.
-- Добавлен `@garun/auth` с Better Auth 1.6.23, Drizzle adapter, password bootstrap flow, hashed single-use magic links и database-backed sessions.
-- Публичные signup и прямые auth request paths отключены; UI использует безопасные server wrappers, generic errors, Origin/CSRF guard и rate limits.
-- Создан идемпотентный непубличный owner/workspace bootstrap с audit event.
-- Реализованы workspace, owner/member membership, централизованные permissions и deny-by-default `TenantContext`.
-- Реализованы owner-only internal invitations: create, resend, revoke, expiry, atomic acceptance и защита от double consume.
-- Raw tokens отсутствуют в БД/audit/log payload; email URL находится только в AES-256-GCM outbox envelope и удаляется после доставки.
-- Worker отправляет Mailpit/SMTP email, использует stable Message-ID, bounded retry/backoff, stale-claim recovery и tenant-scoped recipient lookup.
-- Реализованы own session list/revoke/logout, owner revoke member sessions и membership disable с немедленным session revoke.
-- Добавлены русскоязычные mobile-friendly страницы login, sent, invitation states, access denied и минимальный workspace access UI.
-- Полный локальный stack запускается одной командой `docker compose up -d --build --wait`: migrations, web и worker зависят от healthchecks PostgreSQL/Redis/Mailpit, работают в общем non-root development image и сохраняют прежние volumes.
-- Добавлены unit, PostgreSQL integration, tenant/IDOR/security, desktop E2E и accessibility tests. Полный E2E проходит bootstrap → owner magic login → invitation email → одношаговое acceptance с session → owner denial → session/logout.
-- Миграции `0001_robust_nova.sql` и `0002_yielding_micromax.sql` применены на чистой PostgreSQL 17 базе и безопасно запущены повторно; drift отсутствует.
+- Добавлены `ClientCompany`, `ClientMembership`, `Project`, `ProjectMembership`,
+  `ClientInvitationContext` и `InvitationProjectGrant` с tenant composite foreign keys, indexes,
+  uniqueness и state checks.
+- Реализованы создание, редактирование, архивирование и восстановление компаний и проектов.
+- Черновик скрыт от client/observer; архив read-only; клиентский DTO не содержит внутренних заметок
+  и tenant/internal полей.
+- Project access выдаётся отдельно для каждого проекта. Поддержаны owner, employee с versioned
+  grants, client и read-only observer; неизвестные разрешения запрещены.
+- Добавлены owner preview без impersonation, публикация, клиентское приглашение, повторная отправка,
+  одношаговое принятие и немедленный отзыв project membership.
+- Invitation acceptance транзакционно создаёт/восстанавливает company/project memberships и session.
+  Повторное приглашение не создаёт дубликаты.
+- `project-invitation` проходит через существующий encrypted transactional outbox и worker; raw token
+  отсутствует в БД, обычном payload, audit и логах.
+- Добавлены русскоязычные mobile-friendly списки/карточки клиентов и проектов, internal/client shells,
+  empty/error/read-only states и подтверждения опасных действий.
+- Добавлены mass-assignment, policy, cross-tenant, cross-project, IDOR, archive, invitation/outbox,
+  access revocation, E2E и accessibility tests.
+- Созданы ADR-027/ADR-028 и `docs/CLIENTS_AND_PROJECTS.md` с flow, permission matrix, tenant rules и ER
+  diagram.
 
 ## Текущие задачи
 
-- Активных задач реализации нет. Ветка `feat/milestone-02-identity-workspace` готовится к Pull Request и не объединяется автоматически.
+- Активных задач реализации нет. Требуется зафиксировать и отправить ветку
+  `feat/milestone-03-clients-projects`; она основана на commit Milestone 02 и должна объединяться
+  после Milestone 02.
 
 ## Найденные проблемы
 
-- Better Auth database rate limiting требует отдельную `rate_limit` table; она добавлена второй migration и проверена реальным magic-link flow.
-- Первый outbox dispatcher мог оставить stale `processing` record и повторно брать terminal `failed`; добавлены recovery и bounded terminal state.
-- Первоначальный E2E использовал `127.0.0.1`, тогда как auth links и cookie origin использовали `localhost`; тестовый canonical origin унифицирован на `localhost:3100`.
-- Параллельный desktop/mobile critical-flow test потреблял один и тот же single-use owner magic token. Полный flow оставлен в desktop Chrome, а mobile проект отдельно проверяет responsive/a11y страницы.
-- Direct member invitation request сначала возвращал redirect после policy exception. Owner permission теперь проверяется до mutation и чужой/запрещённый запрос получает одинаковый `404`.
-- Production audit выявил уязвимые версии Nodemailer и транзитивного esbuild; Nodemailer обновлён до 9.0.3, esbuild закреплён на 0.28.1, `pnpm audit --prod` добавлен в CI.
-- E2E global setup раньше зависел от переменных родительского shell, несмотря на подготовленный `apps/web/.env`; setup теперь безопасно загружает локальный env-файл, и документированная команда работает напрямую.
-- Первый branch CI обнаружил, что strict Turbo build env не пропускал `DATABASE_URL` и `REDIS_URL` в Linux Next.js build; обе переменные явно добавлены в build allowlist.
-- Self-review расширил redaction auth/outbox secrets, добавил deny-by-default parsing permission JSON и обязательное подтверждение опасных session/membership/invitation действий.
-- Production deployment, sender domain, Resend credentials и реальные secrets намеренно не создавались.
+- Drizzle сначала сгенерировал composite foreign keys раньше необходимых composite unique indexes.
+  SQL `0003` переупорядочен без изменения схемы; чистая PostgreSQL миграция и drift-check проходят.
+- Первые integration-запуски использовали неверный пароль/контейнерный hostname с Windows host.
+  После загрузки локальной конфигурации project suite прошёл 7/7.
+- E2E сначала переиспользовал Docker-worker, созданный до project email template. Worker пересоздан из
+  актуального общего image; письмо и одношаговый flow прошли.
+- Прямой client POST создания проекта сначала возвращал redirect на конечную страницу. Endpoint
+  теперь выполняет явный `projects.create` check до parsing/mutation и возвращает безопасный 404.
+- Self-review выявил, что employee видел owner-only navigation и клиентский заголовок списка.
+  Internal/management UI states разделены; серверные policies не изменялись.
+- Первый полный integration-run после перезапуска Docker не нашёл остановленный MinIO. После
+  `docker compose up -d --wait minio` полный набор прошёл 17/17.
+- Первый Compose web smoke после пересборки попал в пятосекундный timeout во время загрузки
+  development SWC/компиляции. После прогрева повторный web/worker smoke прошёл.
 
 ## Принятые решения
 
-- ADR-021: Better Auth отвечает за identity/session lifecycle, доменные права остаются в policy layer.
-- ADR-022: TenantContext разрешается только из session + active membership + server lookup; client `workspaceId` недоверенный.
-- ADR-023: Milestone 02 использует encrypted PostgreSQL outbox с прямым worker polling; BullMQ отложен до появления оправданной очереди.
-- ADR-024 сохранён как история первоначального решения и заменён ADR-025.
-- ADR-025 заменяет ADR-024 для пользовательского flow: отдельный verification proof потребляется server-side, поэтому invitation acceptance сразу открывает workspace без второго письма.
-- ADR-026: корневой Compose — единая точка локального запуска полного stack; CI по-прежнему поднимает только infrastructure services.
+- ADR-021–026 Milestone 02 остаются действующими.
+- ADR-027: company membership не открывает проекты автоматически; каждый проект требует явный
+  `ProjectMembership`, а internal/client DTO и queries разделены.
+- ADR-028: компании и проекты архивируются без физического удаления; архив проекта read-only и
+  сохраняет предыдущий статус.
+- `canManageClientMembers` остаётся выключенным по умолчанию; самостоятельное управление коллегами
+  клиента в Milestone 03 не добавлено.
 
 ## Выполненные проверки
 
-- `docker compose up -d --build --wait` собрал общий image, применил migrations и дождался healthy web, worker, PostgreSQL, Redis, MinIO и Mailpit; migration service завершился с кодом 0.
-- `docker compose down` → `docker compose up -d --wait` повторно поднял stack за 19 секунд без удаления named volumes; существующий owner сохранился.
-- Container runtime проверен как non-root UID 1000; Compose logs не содержат настроенных локальных secret values; host `DATABASE_URL` не подменяет container service URL.
-- `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:integration` (10/10), `pnpm build`, `pnpm verify:artifacts`, `pnpm test:e2e` (14/14), повторный `pnpm smoke` и `pnpm audit --prod` прошли.
-- Первый smoke сразу после параллельного E2E попал в пятосекундный timeout во время dev-компиляции `/`; readiness оставался healthy, повтор после завершения компиляции прошёл. Production build/E2E этой проблемы не показали.
-- Локальный password login в Compose раньше создавал session cookie, но перенаправлял браузер на внутренний адрес `http://0.0.0.0:3000`; browser терял host-only cookie и возвращался на login. Все form redirects переведены на валидированный `PUBLIC_APP_URL`, внешний origin запрещён unit-тестом, а отдельный E2E теперь проверяет реальный password login до защищённого workspace.
-- После исправления единый Compose пересобран и дождался всех healthchecks; ручная HTTP-проверка через `localhost:3000` подтвердила `303` на публичный origin, создание cookie, переход в `demo-studio` и HTTP 200 защищённой страницы. E2E прошёл 14/14, включая нажатие «Войти с паролем».
+- `pnpm install --frozen-lockfile` — успешно, lockfile не менялся.
+- `pnpm format`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test` — успешно; core
+  содержит 20 unit tests.
+- `pnpm db:generate` — `No schema changes`; migrations `0000`–`0004` дважды применены на отдельной
+  чистой PostgreSQL 17 базе.
+- `pnpm test:integration` — 17/17, включая 7 project/tenant/IDOR тестов.
+- `pnpm build` и `pnpm verify:artifacts` — успешно; worker artifact не импортирует workspace
+  TypeScript sources.
+- `pnpm test:e2e` — 15/15; project critical flow, mobile viewport и axe-core прошли.
+- `docker compose up -d --build --wait` завершил сборку после превышения лимита вызывающей команды;
+  последующая `docker compose up -d --wait` подтвердила healthy web, worker, PostgreSQL, Redis, MinIO,
+  Mailpit и migration exit 0.
+- Повторный `pnpm smoke` — web/worker успешно; `pnpm audit --prod` — известных уязвимостей нет.
+- `git diff --check`, tracked artifact scan и high-confidence secret pattern scan — успешно.
 
 ## Следующие действия
 
-1. Создать Pull Request из `feat/milestone-02-identity-workspace` и проверить итоговый GitHub Actions run.
-2. Вручную проверить локальный Mailpit flow и UX owner/member на desktop/mobile.
-3. После принятия владелец может объединить ветку с `main`.
-4. Следующий milestone — 03 (клиенты и проекты), но работа над ним не начата.
+1. Создать осмысленные commits и отправить `feat/milestone-03-clients-projects` в `origin`.
+2. Дождаться успешного GitHub Actions run и создать Pull Request после/поверх Milestone 02.
+3. Вручную проверить owner/client UX в Compose на desktop/mobile.
+4. Следующий milestone — 04 (scope, этапы, действия и dashboards), но к нему не приступать до
+   объединения и явного запроса.
 
 ## Известные ограничения
 
-- RLS отложен до отдельного pre-SaaS security review; текущая защита — application-level policies и cross-tenant/IDOR tests.
-- Email delivery имеет at-least-once semantics; stable Message-ID ограничивает дубликаты, но exactly-once SMTP не обещается.
-- Локальный sender использует `.invalid`; production sender/domain/provider остаются конфигурацией без credentials.
-- Owner password создаётся только bootstrap CLI; invited members входят magic link. Password reset, MFA и публичный SaaS onboarding вне Milestone 02.
-- `InvitationProjectGrant` не создан до появления Project в Milestone 03; текущие invitations дают только workspace member access.
-- Audit UI/export появятся по плану позже; Milestone 02 создаёт и тестирует append-only records в БД.
+- Ветка Milestone 03 основана на ещё не объединённом commit Milestone 02 (`75fbbb7`); merge order
+  обязателен: Milestone 02, затем Milestone 03.
+- RLS по подтверждённому решению отложен; текущая защита — application-level scoped policies,
+  composite constraints и автоматические tenant/IDOR tests.
+- Клиентская компания не даёт неявный доступ ко всем проектам; это намеренная модель least
+  privilege.
+- Employee grants управляют только конкретным проектом. UI выдачи workspace-wide permissions и
+  кастомные роли не входят в Milestone 03.
+- Client self-management, scope/этапы/actions, анкеты, файлы, версии, approvals и оплаты отсутствуют
+  до следующих milestones.
+- Локальный Compose использует development image; первый web request после чистой пересборки может
+  потребовать прогрева. Production build и Playwright используют готовый build и такого сбоя не
+  показали.
