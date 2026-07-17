@@ -2,6 +2,9 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   bigint,
+  check,
+  date,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -33,6 +36,33 @@ export const outboxStatus = pgEnum('outbox_status', [
   'processing',
   'delivered',
   'failed',
+]);
+export const clientCompanyStatus = pgEnum('client_company_status', ['active', 'archived']);
+export const clientMembershipRole = pgEnum('client_membership_role', ['primary', 'member']);
+export const projectStatus = pgEnum('project_status', [
+  'draft',
+  'onboarding',
+  'in_progress',
+  'waiting_for_client',
+  'review',
+  'paused',
+  'completed',
+  'maintenance',
+  'archived',
+]);
+export const projectType = pgEnum('project_type', [
+  'website',
+  'landing',
+  'ecommerce',
+  'redesign',
+  'other',
+]);
+export const projectMembershipSide = pgEnum('project_membership_side', ['internal', 'client']);
+export const projectMembershipRole = pgEnum('project_membership_role', [
+  'owner',
+  'employee',
+  'client',
+  'observer',
 ]);
 
 // Better Auth core model. Application code always writes a normalized lowercase email.
@@ -192,11 +222,204 @@ export const invitation = pgTable(
   },
   (table) => [
     uniqueIndex('invitation_token_hash_unique').on(table.tokenHash),
+    uniqueIndex('invitation_id_workspace_unique').on(table.id, table.workspaceId),
     uniqueIndex('invitation_active_workspace_email_unique')
       .on(table.workspaceId, table.email)
       .where(sql`${table.status} = 'pending'`),
     index('invitation_workspace_status_idx').on(table.workspaceId, table.status),
     index('invitation_email_idx').on(table.email),
+  ],
+);
+
+export const clientCompany = pgTable(
+  'client_company',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspace.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    legalName: text('legal_name'),
+    website: text('website'),
+    phone: text('phone'),
+    email: text('email'),
+    messenger: text('messenger'),
+    internalNotes: text('internal_notes'),
+    status: clientCompanyStatus('status').notNull().default('active'),
+    archivedAt: timestamp('archived_at', { withTimezone: true, mode: 'date' }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex('client_company_id_workspace_unique').on(table.id, table.workspaceId),
+    index('client_company_workspace_status_idx').on(table.workspaceId, table.status),
+    index('client_company_workspace_updated_idx').on(table.workspaceId, table.updatedAt),
+  ],
+);
+
+export const clientMembership = pgTable(
+  'client_membership',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    clientCompanyId: uuid('client_company_id').notNull(),
+    userId: uuid('user_id').notNull(),
+    role: clientMembershipRole('role').notNull().default('member'),
+    canApprove: boolean('can_approve').notNull().default(false),
+    canManageMembers: boolean('can_manage_members').notNull().default(false),
+    removedAt: timestamp('removed_at', { withTimezone: true, mode: 'date' }),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.clientCompanyId, table.workspaceId],
+      foreignColumns: [clientCompany.id, clientCompany.workspaceId],
+      name: 'client_membership_company_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.userId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'client_membership_workspace_user_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('client_membership_company_user_unique').on(table.clientCompanyId, table.userId),
+    index('client_membership_workspace_user_idx').on(table.workspaceId, table.userId),
+  ],
+);
+
+export const project = pgTable(
+  'project',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspace.id, { onDelete: 'cascade' }),
+    clientCompanyId: uuid('client_company_id').notNull(),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    description: text('description'),
+    projectType: projectType('project_type').notNull(),
+    status: projectStatus('status').notNull().default('draft'),
+    statusBeforeArchive: projectStatus('status_before_archive'),
+    ownerUserId: uuid('owner_user_id').notNull(),
+    plannedStartDate: date('planned_start_date', { mode: 'string' }).notNull(),
+    plannedEndDate: date('planned_end_date', { mode: 'string' }).notNull(),
+    clientAccessMode: text('client_access_mode').notNull().default('explicit_grants'),
+    publishedAt: timestamp('published_at', { withTimezone: true, mode: 'date' }),
+    archivedAt: timestamp('archived_at', { withTimezone: true, mode: 'date' }),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.clientCompanyId, table.workspaceId],
+      foreignColumns: [clientCompany.id, clientCompany.workspaceId],
+      name: 'project_company_workspace_fk',
+    }).onDelete('restrict'),
+    foreignKey({
+      columns: [table.workspaceId, table.ownerUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'project_owner_workspace_membership_fk',
+    }).onDelete('restrict'),
+    uniqueIndex('project_workspace_slug_unique').on(table.workspaceId, table.slug),
+    uniqueIndex('project_id_workspace_unique').on(table.id, table.workspaceId),
+    index('project_workspace_status_idx').on(table.workspaceId, table.status),
+    index('project_company_status_idx').on(table.clientCompanyId, table.status),
+    check('project_planned_dates_check', sql`${table.plannedEndDate} >= ${table.plannedStartDate}`),
+    check(
+      'project_archive_state_check',
+      sql`(${table.status} = 'archived' AND ${table.statusBeforeArchive} IS NOT NULL AND ${table.statusBeforeArchive} <> 'archived') OR (${table.status} <> 'archived' AND ${table.statusBeforeArchive} IS NULL)`,
+    ),
+  ],
+);
+
+export const projectMembership = pgTable(
+  'project_membership',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    userId: uuid('user_id').notNull(),
+    side: projectMembershipSide('side').notNull(),
+    role: projectMembershipRole('role').notNull(),
+    permissions: jsonb('permissions')
+      .$type<{ version: 1; grants: string[] }>()
+      .notNull()
+      .default({ version: 1, grants: [] }),
+    joinedAt: timestamp('joined_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    removedAt: timestamp('removed_at', { withTimezone: true, mode: 'date' }),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [project.id, project.workspaceId],
+      name: 'project_membership_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.userId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'project_membership_workspace_user_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('project_membership_project_user_unique').on(table.projectId, table.userId),
+    index('project_membership_workspace_user_idx').on(table.workspaceId, table.userId),
+    check(
+      'project_membership_side_role_check',
+      sql`(${table.side} = 'internal' AND ${table.role} IN ('owner', 'employee')) OR (${table.side} = 'client' AND ${table.role} IN ('client', 'observer'))`,
+    ),
+  ],
+);
+
+export const clientInvitationContext = pgTable(
+  'client_invitation_context',
+  {
+    invitationId: uuid('invitation_id').primaryKey(),
+    workspaceId: uuid('workspace_id').notNull(),
+    clientCompanyId: uuid('client_company_id').notNull(),
+    role: clientMembershipRole('role').notNull().default('member'),
+    canApprove: boolean('can_approve').notNull().default(false),
+    canManageMembers: boolean('can_manage_members').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.invitationId, table.workspaceId],
+      foreignColumns: [invitation.id, invitation.workspaceId],
+      name: 'client_invitation_invitation_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.clientCompanyId, table.workspaceId],
+      foreignColumns: [clientCompany.id, clientCompany.workspaceId],
+      name: 'client_invitation_company_workspace_fk',
+    }).onDelete('cascade'),
+    index('client_invitation_workspace_company_idx').on(table.workspaceId, table.clientCompanyId),
+  ],
+);
+
+export const invitationProjectGrant = pgTable(
+  'invitation_project_grant',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    invitationId: uuid('invitation_id').notNull(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    role: projectMembershipRole('role').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.invitationId, table.workspaceId],
+      foreignColumns: [invitation.id, invitation.workspaceId],
+      name: 'invitation_project_grant_invitation_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [project.id, project.workspaceId],
+      name: 'invitation_project_grant_project_workspace_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('invitation_project_grant_invitation_project_unique').on(
+      table.invitationId,
+      table.projectId,
+    ),
+    index('invitation_project_grant_project_idx').on(table.projectId),
+    check('invitation_project_grant_role_check', sql`${table.role} IN ('client', 'observer')`),
   ],
 );
 
@@ -227,7 +450,7 @@ export const auditEvent = pgTable(
 );
 
 export interface OutboxPayload {
-  readonly template: 'workspace-invitation' | 'magic-link';
+  readonly template: 'workspace-invitation' | 'project-invitation' | 'magic-link';
   readonly recipientUserId?: string;
   readonly invitationId?: string;
 }

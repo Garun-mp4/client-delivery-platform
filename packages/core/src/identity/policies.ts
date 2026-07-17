@@ -3,6 +3,10 @@ export const permissions = [
   'members.invite',
   'members.manage',
   'sessions.revoke.other',
+  'clients.manage',
+  'projects.create',
+  'projects.manage',
+  'projects.members.manage',
 ] as const;
 
 export type Permission = (typeof permissions)[number];

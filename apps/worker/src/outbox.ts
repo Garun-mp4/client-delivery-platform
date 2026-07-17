@@ -8,7 +8,7 @@ interface ClaimedEvent {
   id: string;
   workspaceId: string | null;
   payload: {
-    template: 'workspace-invitation' | 'magic-link';
+    template: 'workspace-invitation' | 'project-invitation' | 'magic-link';
     recipientUserId?: string;
     invitationId?: string;
   };
@@ -63,20 +63,36 @@ async function claim(pool: Pool): Promise<ClaimedEvent | null> {
 
 async function resolveRecipient(connection: PoolClient, event: ClaimedEvent) {
   if (
-    event.payload.template === 'workspace-invitation' &&
+    (event.payload.template === 'workspace-invitation' ||
+      event.payload.template === 'project-invitation') &&
     event.payload.invitationId &&
     event.workspaceId
   ) {
-    const result = await connection.query<{ email: string; workspaceName: string }>(
-      'select i.email, w.name as "workspaceName" from invitation i join workspace w on w.id = i.workspace_id where i.id = $1 and i.workspace_id = $2',
+    const result = await connection.query<{
+      email: string;
+      workspaceName: string;
+      projectName: string | null;
+    }>(
+      `select i.email, w.name as "workspaceName", p.name as "projectName"
+       from invitation i
+       join workspace w on w.id = i.workspace_id
+       left join invitation_project_grant g on g.invitation_id = i.id and g.workspace_id = i.workspace_id
+       left join project p on p.id = g.project_id and p.workspace_id = g.workspace_id
+       where i.id = $1 and i.workspace_id = $2
+       order by g.created_at
+       limit 1`,
       [event.payload.invitationId, event.workspaceId],
     );
     const row = result.rows[0];
     return row
       ? {
           email: row.email,
-          subject: `Приглашение в ${row.workspaceName}`,
-          text: `Вас пригласили в рабочее пространство «${row.workspaceName}». Откройте одноразовую ссылку: `,
+          subject: row.projectName
+            ? `Приглашение в проект «${row.projectName}»`
+            : `Приглашение в ${row.workspaceName}`,
+          text: row.projectName
+            ? `Вас пригласили в проект «${row.projectName}» рабочего пространства «${row.workspaceName}». Откройте одноразовую ссылку: `
+            : `Вас пригласили в рабочее пространство «${row.workspaceName}». Откройте одноразовую ссылку: `,
         }
       : null;
   }
