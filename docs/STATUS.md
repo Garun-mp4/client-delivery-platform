@@ -34,9 +34,7 @@
 
 ## Текущие задачи
 
-- Активных задач реализации нет. Требуется зафиксировать и отправить ветку
-  `feat/milestone-03-clients-projects`; она основана на commit Milestone 02 и должна объединяться
-  после Milestone 02.
+- Активных задач реализации нет. Milestones 01–03 объединены в `main` в правильном порядке.
 
 ## Найденные проблемы
 
@@ -84,16 +82,13 @@
 
 ## Следующие действия
 
-1. Создать осмысленные commits и отправить `feat/milestone-03-clients-projects` в `origin`.
-2. Дождаться успешного GitHub Actions run и создать Pull Request после/поверх Milestone 02.
-3. Вручную проверить owner/client UX в Compose на desktop/mobile.
-4. Следующий milestone — 04 (scope, этапы, действия и dashboards), но к нему не приступать до
-   объединения и явного запроса.
+1. Дождаться успешного GitHub Actions run для итогового `main`.
+2. Вручную проверить owner/client UX в Compose на desktop/mobile.
+3. Следующий milestone — 04 (scope, этапы, действия и dashboards), но к нему не приступать без
+   явного запроса.
 
 ## Известные ограничения
 
-- Ветка Milestone 03 основана на ещё не объединённом commit Milestone 02 (`75fbbb7`); merge order
-  обязателен: Milestone 02, затем Milestone 03.
 - RLS по подтверждённому решению отложен; текущая защита — application-level scoped policies,
   composite constraints и автоматические tenant/IDOR tests.
 - Клиентская компания не даёт неявный доступ ко всем проектам; это намеренная модель least
