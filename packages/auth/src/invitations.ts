@@ -10,7 +10,17 @@ import {
   type TenantContext,
 } from '@garun/core/identity';
 import type { DatabaseClient } from '@garun/db';
-import { auditEvent, invitation, user, workspaceMembership } from '@garun/db/schema';
+import {
+  auditEvent,
+  clientInvitationContext,
+  clientMembership,
+  invitation,
+  invitationProjectGrant,
+  project,
+  projectMembership,
+  user,
+  workspaceMembership,
+} from '@garun/db/schema';
 
 import { enqueueEmail } from './outbox';
 
@@ -128,6 +138,11 @@ export async function resendInvitation(
   const tokenHash = hashOneTimeToken(token);
   const expiresAt = new Date(Date.now() + input.ttlHours * 60 * 60 * 1000);
   return client.db.transaction(async (tx) => {
+    const [clientContext] = await tx
+      .select({ invitationId: clientInvitationContext.invitationId })
+      .from(clientInvitationContext)
+      .where(eq(clientInvitationContext.invitationId, invitationId))
+      .limit(1);
     const [updated] = await tx
       .update(invitation)
       .set({ tokenHash, expiresAt, updatedAt: new Date() })
@@ -153,7 +168,10 @@ export async function resendInvitation(
       eventType: 'invitation.email.requested',
       aggregateType: 'invitation',
       aggregateId: updated.id,
-      payload: { template: 'workspace-invitation', invitationId: updated.id },
+      payload: {
+        template: clientContext ? 'project-invitation' : 'workspace-invitation',
+        invitationId: updated.id,
+      },
       secret: new URL(`/invite/${token}`, input.appUrl).toString(),
       encryptionKey: input.encryptionKey,
     });
@@ -200,12 +218,143 @@ export async function acceptInvitation(
     }
     if (!acceptedUser) throw new Error('INVITATION_USER_FAILED');
 
-    const [membership] = await tx
+    const [context] = await tx
+      .select()
+      .from(clientInvitationContext)
+      .where(eq(clientInvitationContext.invitationId, pending.id))
+      .limit(1);
+    const grants = context
+      ? await tx
+          .select({
+            projectId: invitationProjectGrant.projectId,
+            role: invitationProjectGrant.role,
+            projectSlug: project.slug,
+            projectStatus: project.status,
+          })
+          .from(invitationProjectGrant)
+          .innerJoin(
+            project,
+            and(
+              eq(project.id, invitationProjectGrant.projectId),
+              eq(project.workspaceId, invitationProjectGrant.workspaceId),
+            ),
+          )
+          .where(
+            and(
+              eq(invitationProjectGrant.invitationId, pending.id),
+              eq(invitationProjectGrant.workspaceId, pending.workspaceId),
+            ),
+          )
+      : [];
+    if (
+      context &&
+      (grants.length === 0 ||
+        grants.some((grant) => ['draft', 'archived'].includes(grant.projectStatus)))
+    ) {
+      throw new InvitationError('INVITATION_INVALID');
+    }
+
+    const [createdWorkspaceMembership] = await tx
       .insert(workspaceMembership)
       .values({ workspaceId: pending.workspaceId, userId: acceptedUser.id, role: pending.role })
       .onConflictDoNothing()
       .returning({ id: workspaceMembership.id });
-    if (!membership) throw new InvitationError('INVITATION_CONFLICT');
+    let workspaceMembershipId = createdWorkspaceMembership?.id;
+    if (!workspaceMembershipId) {
+      const [existingWorkspaceMembership] = await tx
+        .select({ id: workspaceMembership.id, status: workspaceMembership.status })
+        .from(workspaceMembership)
+        .where(
+          and(
+            eq(workspaceMembership.workspaceId, pending.workspaceId),
+            eq(workspaceMembership.userId, acceptedUser.id),
+          ),
+        )
+        .limit(1);
+      if (!context || existingWorkspaceMembership?.status !== 'active') {
+        throw new InvitationError('INVITATION_CONFLICT');
+      }
+      workspaceMembershipId = existingWorkspaceMembership.id;
+    }
+
+    const createdDomainMemberships: Array<{
+      id: string;
+      type: 'client_membership' | 'project_membership';
+    }> = [];
+    if (context) {
+      const [createdClientMembership] = await tx
+        .insert(clientMembership)
+        .values({
+          workspaceId: pending.workspaceId,
+          clientCompanyId: context.clientCompanyId,
+          userId: acceptedUser.id,
+          role: context.role,
+          canApprove: context.canApprove,
+          canManageMembers: context.canManageMembers,
+        })
+        .onConflictDoUpdate({
+          target: [clientMembership.clientCompanyId, clientMembership.userId],
+          set: {
+            role: context.role,
+            canApprove: context.canApprove,
+            canManageMembers: context.canManageMembers,
+            removedAt: null,
+            updatedAt: new Date(),
+          },
+        })
+        .returning({ id: clientMembership.id });
+      if (createdClientMembership) {
+        createdDomainMemberships.push({
+          id: createdClientMembership.id,
+          type: 'client_membership',
+        });
+      }
+      for (const grant of grants) {
+        const [existingProjectMembership] = await tx
+          .select({ side: projectMembership.side, removedAt: projectMembership.removedAt })
+          .from(projectMembership)
+          .where(
+            and(
+              eq(projectMembership.projectId, grant.projectId),
+              eq(projectMembership.userId, acceptedUser.id),
+            ),
+          )
+          .limit(1);
+        if (
+          existingProjectMembership?.side === 'internal' &&
+          !existingProjectMembership.removedAt
+        ) {
+          throw new InvitationError('INVITATION_CONFLICT');
+        }
+        const [createdProjectMembership] = await tx
+          .insert(projectMembership)
+          .values({
+            workspaceId: pending.workspaceId,
+            projectId: grant.projectId,
+            userId: acceptedUser.id,
+            side: 'client',
+            role: grant.role,
+          })
+          .onConflictDoUpdate({
+            target: [projectMembership.projectId, projectMembership.userId],
+            set: {
+              side: 'client',
+              role: grant.role,
+              permissions: { version: 1, grants: [] },
+              joinedAt: new Date(),
+              removedAt: null,
+              updatedAt: new Date(),
+            },
+          })
+          .returning({ id: projectMembership.id });
+        if (createdProjectMembership) {
+          createdDomainMemberships.push({
+            id: createdProjectMembership.id,
+            type: 'project_membership',
+          });
+        }
+      }
+    }
     await tx
       .update(invitation)
       .set({
@@ -224,16 +373,32 @@ export async function acceptInvitation(
         entityId: pending.id,
         requestId: request.requestId,
       },
-      {
+      ...(createdWorkspaceMembership
+        ? [
+            {
+              workspaceId: pending.workspaceId,
+              actorUserId: acceptedUser.id,
+              action: 'membership.created',
+              entityType: 'workspace_membership',
+              entityId: workspaceMembershipId,
+              requestId: request.requestId,
+            },
+          ]
+        : []),
+      ...createdDomainMemberships.map((membership) => ({
         workspaceId: pending.workspaceId,
         actorUserId: acceptedUser.id,
-        action: 'membership.created',
-        entityType: 'workspace_membership',
+        action: `${membership.type}.created`,
+        entityType: membership.type,
         entityId: membership.id,
         requestId: request.requestId,
-      },
+      })),
     ]);
-    return { userId: acceptedUser.id, workspaceId: pending.workspaceId };
+    return {
+      userId: acceptedUser.id,
+      workspaceId: pending.workspaceId,
+      projectSlug: grants[0]?.projectSlug,
+    };
   });
 }
 

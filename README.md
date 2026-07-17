@@ -1,8 +1,9 @@
 # Garun Workspace
 
-Client Delivery Platform. **Milestone 02** добавляет invitation-only identity, database-backed
-sessions, workspace membership, deny-by-default RBAC, tenant isolation, audit trail и transactional
-email outbox. Клиенты, проекты и другие продуктовые модули ещё не реализуются.
+Client Delivery Platform. **Milestone 03** добавляет компании клиентов, проекты, явные project
+memberships, публикацию и одношаговое приглашение клиента. Identity, database-backed sessions,
+deny-by-default RBAC, tenant isolation, audit trail и transactional email outbox сохранены как
+серверная граница доступа.
 
 ## Требования
 
@@ -112,6 +113,11 @@ Mailpit и примите приглашение. Одна ссылка созд
 последующих входов. Для Gmail, Mail.ru и Яндекс Почты экран ожидания показывает необязательную
 ссылку на соответствующий webmail, не выполняя автоматический redirect.
 
+Для проверки Milestone 03 откройте раздел «Клиенты», создайте компанию, затем в разделе «Проекты»
+создайте черновик. Клиент не видит черновик. После проверки «глазами клиента» опубликуйте проект,
+отправьте приглашение представителю и откройте его письмо в Mailpit. Одна ссылка создаёт клиентский
+доступ и сразу открывает только этот проект. Внутренние заметки в клиентский DTO не входят.
+
 Health endpoints возвращают только service/check status и correlation ID. Connection strings,
 credentials и тексты ошибок зависимостей в ответ не включаются.
 
@@ -208,13 +214,13 @@ packages/
   auth/                 Better Auth composition, invitation service и encrypted outbox
   config/               runtime validation и конфигурируемые defaults
   contracts/            transport DTO/error/health contracts
-  core/                 identity primitives, RBAC policies и TenantContext
+  core/                 identity, TenantContext, clients/projects policies и application services
   db/                   Drizzle schema, client и migrations
   observability/        Pino logger, redaction, correlation IDs
   ui/                   базовые доступные UI-компоненты
 tooling/
   eslint/               единые flat ESLint configs
-  integration-tests/    infrastructure, auth, invitation и tenant-isolation tests
+  integration-tests/    infrastructure, auth, projects, invitation и tenant/IDOR tests
   quality/              repository formatting task
   typescript/           единые strict TypeScript configs
 infra/
@@ -224,15 +230,18 @@ compose.yaml            корневая точка входа в локальн
 docs/                   решения, план и статус
 ```
 
-Приложения импортируют shared code только через workspace packages. Бизнес-модули будут добавляться
-в `packages/core` по milestones и не должны размещаться внутри UI или Route Handlers.
+Приложения импортируют shared code только через workspace packages. Route Handlers выполняют
+transport/composition, а project/client policies и мутации находятся в `packages/core`.
 
 ## Безопасность конфигурации
 
 - Не коммитьте `.env`, tokens, passwords, magic links и production endpoints.
 - `.env.example` содержит только явно локальные placeholder-значения.
-- `workspaceId` из будущего клиентского запроса никогда не будет доверенным tenant context.
+- `workspaceId` из клиентского запроса никогда не является доверенным tenant context.
 - Защищённый workspace разрешается только через session → active membership → server policy.
+- `ClientMembership` не открывает все проекты компании: каждый проект требует отдельный активный
+  `ProjectMembership`.
+- Черновики скрыты от client/observer, архивы read-only, внутренние и клиентские DTO разделены.
 - Raw invitation/magic tokens не хранятся в БД, audit или structured logs.
 - Логи используют структурированный JSON и redact известные credential fields.
 - Локальный Mailpit не пересылает письма во внешние сервисы.

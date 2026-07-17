@@ -1,0 +1,4 @@
+ALTER TABLE "invitation_project_grant" ADD CONSTRAINT "invitation_project_grant_role_check" CHECK ("invitation_project_grant"."role" IN ('client', 'observer'));--> statement-breakpoint
+ALTER TABLE "project" ADD CONSTRAINT "project_planned_dates_check" CHECK ("project"."planned_end_date" >= "project"."planned_start_date");--> statement-breakpoint
+ALTER TABLE "project" ADD CONSTRAINT "project_archive_state_check" CHECK (("project"."status" = 'archived' AND "project"."status_before_archive" IS NOT NULL AND "project"."status_before_archive" <> 'archived') OR ("project"."status" <> 'archived' AND "project"."status_before_archive" IS NULL));--> statement-breakpoint
+ALTER TABLE "project_membership" ADD CONSTRAINT "project_membership_side_role_check" CHECK (("project_membership"."side" = 'internal' AND "project_membership"."role" IN ('owner', 'employee')) OR ("project_membership"."side" = 'client' AND "project_membership"."role" IN ('client', 'observer')));
