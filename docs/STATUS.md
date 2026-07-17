@@ -34,7 +34,7 @@ Milestone 06 не начат.
 ## Текущие задачи
 
 - Активных задач реализации нет.
-- Ветка Milestone 05 готова к отправке и CI-проверке; объединение с `main` не выполняется.
+- Ветка Milestone 05 отправлена, GitHub Actions успешен; объединение с `main` не выполняется.
 - Milestone 06 не начат.
 
 ## Найденные проблемы
@@ -78,11 +78,11 @@ Milestone 06 не начат.
   web/worker/PostgreSQL/Redis/MinIO/Mailpit healthy.
 - `pnpm smoke` — web и worker успешно; `pnpm audit --prod` — известных уязвимостей нет.
 - `git diff --check`, tracked artifact scan и high-confidence secret scan — успешно.
-- GitHub Actions будет зафиксирован после отправки ветки.
+- GitHub Actions run `29578697017` для handoff commit завершён успешно.
 
 ## Следующие действия
 
-1. Отправить ветку Milestone 05 и дождаться итогового GitHub Actions.
+1. Провести review и объединить Milestone 05 через Pull Request.
 2. Следующий milestone — 06 (файлы и материалы), но не начинать без явного запроса.
 
 ## Известные ограничения
