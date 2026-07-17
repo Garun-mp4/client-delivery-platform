@@ -103,6 +103,17 @@ export const actionItemPriority = pgEnum('action_item_priority', [
   'urgent',
 ]);
 export const actionItemVisibility = pgEnum('action_item_visibility', ['internal', 'client']);
+export const questionnaireStatus = pgEnum('questionnaire_status', [
+  'open',
+  'submitted',
+  'completed',
+  'cancelled',
+]);
+export const questionnaireSubmissionStatus = pgEnum('questionnaire_submission_status', [
+  'submitted',
+  'clarification_requested',
+  'accepted',
+]);
 
 // Better Auth core model. Application code always writes a normalized lowercase email.
 export const user = pgTable(
@@ -667,10 +678,224 @@ export const projectMembership = pgTable(
       name: 'project_membership_workspace_user_fk',
     }).onDelete('cascade'),
     uniqueIndex('project_membership_project_user_unique').on(table.projectId, table.userId),
+    uniqueIndex('project_membership_project_workspace_user_unique').on(
+      table.projectId,
+      table.workspaceId,
+      table.userId,
+    ),
     index('project_membership_workspace_user_idx').on(table.workspaceId, table.userId),
     check(
       'project_membership_side_role_check',
       sql`(${table.side} = 'internal' AND ${table.role} IN ('owner', 'employee')) OR (${table.side} = 'client' AND ${table.role} IN ('client', 'observer'))`,
+    ),
+  ],
+);
+
+export const questionnaire = pgTable(
+  'questionnaire',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    title: text('title').notNull(),
+    description: text('description'),
+    schemaVersion: integer('schema_version').notNull().default(1),
+    schemaSnapshot: jsonb('schema_snapshot').$type<unknown>().notNull(),
+    status: questionnaireStatus('status').notNull().default('open'),
+    assignedToUserId: uuid('assigned_to_user_id').notNull(),
+    createdByUserId: uuid('created_by_user_id').notNull(),
+    dueAt: timestamp('due_at', { withTimezone: true, mode: 'date' }),
+    submittedAt: timestamp('submitted_at', { withTimezone: true, mode: 'date' }),
+    completedAt: timestamp('completed_at', { withTimezone: true, mode: 'date' }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true, mode: 'date' }),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [project.id, project.workspaceId],
+      name: 'questionnaire_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId, table.assignedToUserId],
+      foreignColumns: [
+        projectMembership.projectId,
+        projectMembership.workspaceId,
+        projectMembership.userId,
+      ],
+      name: 'questionnaire_assignee_project_membership_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.createdByUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'questionnaire_creator_workspace_membership_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('questionnaire_id_workspace_unique').on(table.id, table.workspaceId),
+    uniqueIndex('questionnaire_id_project_workspace_unique').on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
+    index('questionnaire_project_status_idx').on(table.projectId, table.status),
+    index('questionnaire_assignee_status_due_idx').on(
+      table.workspaceId,
+      table.assignedToUserId,
+      table.status,
+      table.dueAt,
+    ),
+    check('questionnaire_schema_version_check', sql`${table.schemaVersion} > 0`),
+    check(
+      'questionnaire_state_timestamps_check',
+      sql`(${table.status} = 'open' AND ${table.completedAt} IS NULL AND ${table.cancelledAt} IS NULL) OR (${table.status} = 'submitted' AND ${table.submittedAt} IS NOT NULL AND ${table.completedAt} IS NULL AND ${table.cancelledAt} IS NULL) OR (${table.status} = 'completed' AND ${table.submittedAt} IS NOT NULL AND ${table.completedAt} IS NOT NULL AND ${table.cancelledAt} IS NULL) OR (${table.status} = 'cancelled' AND ${table.cancelledAt} IS NOT NULL AND ${table.completedAt} IS NULL)`,
+    ),
+  ],
+);
+
+export const questionnaireDraft = pgTable(
+  'questionnaire_draft',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    questionnaireId: uuid('questionnaire_id').notNull(),
+    userId: uuid('user_id').notNull(),
+    answers: jsonb('answers').$type<Record<string, unknown>>().notNull().default({}),
+    version: integer('version').notNull().default(1),
+    lastIdempotencyKey: text('last_idempotency_key'),
+    lastSavedAt: timestamp('last_saved_at', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.questionnaireId, table.projectId, table.workspaceId],
+      foreignColumns: [questionnaire.id, questionnaire.projectId, questionnaire.workspaceId],
+      name: 'questionnaire_draft_questionnaire_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId, table.userId],
+      foreignColumns: [
+        projectMembership.projectId,
+        projectMembership.workspaceId,
+        projectMembership.userId,
+      ],
+      name: 'questionnaire_draft_user_project_membership_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('questionnaire_draft_questionnaire_unique').on(table.questionnaireId),
+    index('questionnaire_draft_user_updated_idx').on(
+      table.workspaceId,
+      table.userId,
+      table.updatedAt,
+    ),
+    check('questionnaire_draft_version_check', sql`${table.version} > 0`),
+  ],
+);
+
+export const questionnaireSubmission = pgTable(
+  'questionnaire_submission',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    questionnaireId: uuid('questionnaire_id').notNull(),
+    revision: integer('revision').notNull(),
+    schemaSnapshot: jsonb('schema_snapshot').$type<unknown>().notNull(),
+    answers: jsonb('answers').$type<Record<string, unknown>>().notNull(),
+    status: questionnaireSubmissionStatus('status').notNull().default('submitted'),
+    submittedByUserId: uuid('submitted_by_user_id').notNull(),
+    submittedAt: timestamp('submitted_at', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    reviewedByUserId: uuid('reviewed_by_user_id'),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true, mode: 'date' }),
+    reviewComment: text('review_comment'),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.questionnaireId, table.projectId, table.workspaceId],
+      foreignColumns: [questionnaire.id, questionnaire.projectId, questionnaire.workspaceId],
+      name: 'questionnaire_submission_questionnaire_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId, table.submittedByUserId],
+      foreignColumns: [
+        projectMembership.projectId,
+        projectMembership.workspaceId,
+        projectMembership.userId,
+      ],
+      name: 'questionnaire_submission_submitter_project_membership_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('questionnaire_submission_questionnaire_revision_unique').on(
+      table.questionnaireId,
+      table.revision,
+    ),
+    uniqueIndex('questionnaire_submission_id_project_workspace_unique').on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
+    uniqueIndex('questionnaire_submission_id_questionnaire_project_workspace_unique').on(
+      table.id,
+      table.questionnaireId,
+      table.projectId,
+      table.workspaceId,
+    ),
+    index('questionnaire_submission_questionnaire_created_idx').on(
+      table.questionnaireId,
+      table.createdAt,
+    ),
+    check('questionnaire_submission_revision_check', sql`${table.revision} > 0`),
+    check(
+      'questionnaire_submission_review_state_check',
+      sql`(${table.status} = 'submitted' AND ${table.reviewedByUserId} IS NULL AND ${table.reviewedAt} IS NULL AND ${table.reviewComment} IS NULL) OR (${table.status} = 'clarification_requested' AND ${table.reviewedByUserId} IS NOT NULL AND ${table.reviewedAt} IS NOT NULL AND nullif(btrim(${table.reviewComment}), '') IS NOT NULL) OR (${table.status} = 'accepted' AND ${table.reviewedByUserId} IS NOT NULL AND ${table.reviewedAt} IS NOT NULL)`,
+    ),
+  ],
+);
+
+export const questionnaireAnswerComment = pgTable(
+  'questionnaire_answer_comment',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    questionnaireId: uuid('questionnaire_id').notNull(),
+    submissionId: uuid('submission_id').notNull(),
+    fieldId: text('field_id').notNull(),
+    body: text('body').notNull(),
+    createdByUserId: uuid('created_by_user_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.submissionId, table.questionnaireId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        questionnaireSubmission.id,
+        questionnaireSubmission.questionnaireId,
+        questionnaireSubmission.projectId,
+        questionnaireSubmission.workspaceId,
+      ],
+      name: 'questionnaire_comment_submission_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.questionnaireId, table.projectId, table.workspaceId],
+      foreignColumns: [questionnaire.id, questionnaire.projectId, questionnaire.workspaceId],
+      name: 'questionnaire_comment_questionnaire_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.createdByUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'questionnaire_comment_author_workspace_membership_fk',
+    }).onDelete('cascade'),
+    index('questionnaire_comment_submission_field_idx').on(table.submissionId, table.fieldId),
+    check(
+      'questionnaire_comment_field_nonempty_check',
+      sql`nullif(btrim(${table.fieldId}), '') IS NOT NULL`,
+    ),
+    check(
+      'questionnaire_comment_body_nonempty_check',
+      sql`nullif(btrim(${table.body}), '') IS NOT NULL`,
     ),
   ],
 );

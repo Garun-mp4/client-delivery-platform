@@ -53,6 +53,12 @@ function ClientProjectView({
           href={`/workspace/${workspaceSlug}/projects/${slug}/workflow`}
         >
           Открыть план и действия
+        </Link>{' '}
+        <Link
+          className="provider-link"
+          href={`/workspace/${workspaceSlug}/projects/${slug}/questionnaires`}
+        >
+          Открыть анкеты
         </Link>
       </p>
       {item.status === 'archived' ? (
@@ -154,6 +160,12 @@ export default async function ProjectPage({
           href={`/workspace/${slug}/projects/${projectSlug}/workflow`}
         >
           План, этапы и действия
+        </Link>
+        <Link
+          className="provider-link"
+          href={`/workspace/${slug}/projects/${projectSlug}/questionnaires`}
+        >
+          Анкеты
         </Link>
         <Link
           className="provider-link"
