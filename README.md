@@ -85,8 +85,10 @@ docker compose logs -f web worker
 
 ### 3. Создать первого владельца
 
-Bootstrap — непубличная CLI-команда. Она не печатает email, password или session token и безопасно
-завершается при повторном запуске для того же workspace owner.
+Bootstrap — непубличная CLI-команда. Она не печатает email, password или session token, отмечает
+созданного владельца как подтверждённого и безопасно завершается при повторном запуске для того же
+workspace owner. Повторный запуск восстанавливает отсутствующий credential account, но не
+перезаписывает существующий пароль.
 
 ```powershell
 $env:BOOTSTRAP_OWNER_EMAIL = 'owner@example.test'

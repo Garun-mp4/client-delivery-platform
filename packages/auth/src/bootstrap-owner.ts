@@ -1,8 +1,9 @@
-import { eq } from 'drizzle-orm';
+import { hashPassword } from 'better-auth/crypto';
+import { and, eq } from 'drizzle-orm';
 
 import { normalizeEmail } from '@garun/core/identity';
 import { parseWebEnv } from '@garun/config';
-import { auditEvent, user, workspace, workspaceMembership } from '@garun/db/schema';
+import { account, auditEvent, user, workspace, workspaceMembership } from '@garun/db/schema';
 import { createDatabaseClient } from '@garun/db';
 
 import { createAuth } from './auth';
@@ -42,6 +43,27 @@ try {
       .limit(1);
   }
   if (!owner) throw new Error('BOOTSTRAP_USER_FAILED');
+
+  const passwordHash = await hashPassword(password);
+  await client.db.transaction(async (tx) => {
+    await tx
+      .update(user)
+      .set({ emailVerified: true, updatedAt: new Date() })
+      .where(eq(user.id, owner.id));
+    const [credential] = await tx
+      .select({ id: account.id })
+      .from(account)
+      .where(and(eq(account.userId, owner.id), eq(account.providerId, 'credential')))
+      .limit(1);
+    if (!credential) {
+      await tx.insert(account).values({
+        accountId: owner.id,
+        providerId: 'credential',
+        userId: owner.id,
+        password: passwordHash,
+      });
+    }
+  });
 
   const result = await client.db.transaction(async (tx) => {
     const [existing] = await tx

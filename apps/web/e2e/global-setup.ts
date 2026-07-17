@@ -23,6 +23,10 @@ export default async function globalSetup() {
       [owner] = await database.db.select({ id: user.id }).from(user).where(eq(user.email, email));
     }
     if (!owner) throw new Error('E2E owner bootstrap failed');
+    await database.db
+      .update(user)
+      .set({ emailVerified: true, updatedAt: new Date() })
+      .where(eq(user.id, owner.id));
     const passwordHash = await hashPassword(password);
     const [credential] = await database.db
       .select({ id: account.id })

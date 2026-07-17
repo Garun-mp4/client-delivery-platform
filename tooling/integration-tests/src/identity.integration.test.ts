@@ -70,6 +70,10 @@ beforeAll(async () => {
     .where(eq(user.email, ownerEmail));
   if (!owner) throw new Error('owner setup failed');
   ownerId = owner.id;
+  await client.db
+    .update(user)
+    .set({ emailVerified: true, updatedAt: new Date() })
+    .where(eq(user.id, ownerId));
   [workspaceAId, workspaceBId] = await client.db.transaction(async (tx) => {
     const spaces = await tx
       .insert(workspace)
@@ -97,6 +101,36 @@ afterAll(async () => {
 });
 
 describe('identity and tenant isolation', () => {
+  it('keeps a trusted bootstrap owner credential after magic-link login', async () => {
+    let magicLinkUrl = '';
+    const auth = createAuth(client.db, authEnvironment, false, async ({ url }) => {
+      magicLinkUrl = url;
+    });
+    await auth.api.signInMagicLink({
+      body: {
+        email: ownerEmail,
+        callbackURL: `/workspace/a-${suffix}`,
+        errorCallbackURL: '/login?error=link',
+      },
+      headers: new Headers({ origin: authEnvironment.PUBLIC_APP_URL }),
+    });
+    expect(magicLinkUrl).not.toBe('');
+    const magicLinkResponse = await auth.handler(
+      new Request(magicLinkUrl, {
+        headers: new Headers({ origin: authEnvironment.PUBLIC_APP_URL }),
+      }),
+    );
+    expect(magicLinkResponse.status).toBeGreaterThanOrEqual(300);
+    expect(magicLinkResponse.status).toBeLessThan(400);
+
+    const passwordResponse = await auth.api.signInEmail({
+      body: { email: ownerEmail, password: 'IntegrationPassword-2026!' },
+      headers: new Headers({ origin: authEnvironment.PUBLIC_APP_URL }),
+      asResponse: true,
+    });
+    expect(passwordResponse.ok).toBe(true);
+  });
+
   it('persists and revokes a database-backed session', async () => {
     const auth = createAuth(client.db, authEnvironment);
     const response = await auth.api.signInEmail({

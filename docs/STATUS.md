@@ -45,6 +45,11 @@
 - Первый расширенный E2E дошёл до конца workflow, но остался на workflow URL перед отзывом project
   access и исчерпал старый 30-секундный timeout. Тест явно возвращается в карточку проекта и имеет
   60-секундный лимит; повторный critical flow прошёл.
+- Post-merge CI на чистой БД выявил, что CLI bootstrap оставлял owner с `emailVerified=false`.
+  Better Auth при первом magic-link proof корректно отзывал его неподтверждённые credential и
+  sessions, после чего пароль переставал работать. Bootstrap и E2E setup теперь явно подтверждают
+  доверенного owner; CLI также восстанавливает отсутствующий credential account. Регрессия покрыта
+  integration-тестом и повторным E2E на новой пустой базе.
 
 ## Принятые решения
 
@@ -61,7 +66,8 @@
 - `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test` —
   успешно.
 - Миграция `0005` применена как upgrade локального Compose и на отдельной чистой PostgreSQL 17 базе.
-- `pnpm test:integration` — 20/20, включая 3 workflow/tenant/immutability теста.
+- `pnpm test:integration` — 21/21, включая 3 workflow/tenant/immutability теста и сохранение
+  credential доверенного owner после magic-link login.
 - `pnpm build` и `pnpm verify:artifacts` — успешно; web route tree и независимый worker artifact
   собраны.
 - `docker compose up -d --build --wait` — успешно; migration exit 0, web/worker/PostgreSQL/Redis/
