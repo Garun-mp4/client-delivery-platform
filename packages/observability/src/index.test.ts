@@ -18,12 +18,15 @@ describe('observability foundation', () => {
     logger.info(
       {
         environment: {
+          BETTER_AUTH_SECRET: 'better-auth-secret',
           DATABASE_URL: 'postgresql://user:database-secret@database.example.test/app',
+          OUTBOX_ENCRYPTION_KEY: 'outbox-encryption-secret',
           REDIS_URL: 'redis://:redis-secret@redis.example.test:6379',
         },
         password: 'sensitive-password',
         request: { headers: { authorization: 'Bearer sensitive-authorization' } },
         token: 'sensitive-token',
+        url: 'https://example.test/magic/private-token',
       },
       'safe event',
     );
@@ -33,6 +36,9 @@ describe('observability foundation', () => {
     expect(output).not.toContain('database-secret');
     expect(output).not.toContain('redis-secret');
     expect(output).not.toContain('sensitive-authorization');
+    expect(output).not.toContain('better-auth-secret');
+    expect(output).not.toContain('outbox-encryption-secret');
+    expect(output).not.toContain('private-token');
     expect(output).toContain('[REDACTED]');
   });
 

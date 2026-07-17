@@ -9,3 +9,5 @@ export function defineModule<const TModule extends ApplicationModule>(module: TM
 
   return Object.freeze(module);
 }
+
+export * from './identity/index';

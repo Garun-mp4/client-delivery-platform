@@ -1,0 +1,34 @@
+{
+  "name": "@garun/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./crypto": "./src/crypto.ts",
+    "./outbox": "./src/outbox.ts"
+  },
+  "scripts": {
+    "bootstrap:owner": "tsx --env-file-if-exists=../../apps/web/.env src/bootstrap-owner.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@garun/config": "workspace:*",
+    "@garun/core": "workspace:*",
+    "@garun/db": "workspace:*",
+    "@garun/observability": "workspace:*",
+    "better-auth": "catalog:",
+    "drizzle-orm": "catalog:"
+  },
+  "devDependencies": {
+    "@garun/eslint-config": "workspace:*",
+    "@garun/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

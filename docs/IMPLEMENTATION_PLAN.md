@@ -64,9 +64,9 @@ Milestones 01–10 образуют первый рабочий MVP. Milestones 
 
 **Цель.** Получить минимальное приложение и worker, которые воспроизводимо запускаются локально и проходят CI.
 
-**Функции.** pnpm/Turborepo; Next.js shell на русском; health/readiness endpoints; worker health; env validation; базовые design tokens и доступные компоненты; structured logger с redaction; единый error envelope/request ID; Docker Compose для PostgreSQL, Redis, MinIO и Mailpit; CI quality gates. Product name, public URLs, environment names, provider endpoints, limits и retention defaults задаются конфигурацией без production secrets.
+**Функции.** pnpm/Turborepo; Next.js shell на русском; health/readiness endpoints; worker health; env validation; базовые design tokens и доступные компоненты; structured logger с redaction; единый error envelope/request ID; единый локальный Docker Compose для web, worker, migrations, PostgreSQL, Redis, MinIO и Mailpit; CI quality gates. Product name, public URLs, environment names, provider endpoints, limits и retention defaults задаются конфигурацией без production secrets.
 
-**Модули и файлы.** Корневые `package.json`, `pnpm-workspace.yaml`, `turbo.json`, lockfile; `apps/web`, `apps/worker`; `packages/config`, `packages/contracts`, `packages/ui`, `packages/observability`, `packages/db`; `infra/compose.yaml`; `.github/workflows/ci.yml`; `.env.example`; README и local setup.
+**Модули и файлы.** Корневые `package.json`, `pnpm-workspace.yaml`, `turbo.json`, lockfile и `compose.yaml`; `apps/web`, `apps/worker`; `packages/config`, `packages/contracts`, `packages/ui`, `packages/observability`, `packages/db`; `infra/compose.yaml`, `infra/Dockerfile.local`; `.github/workflows/ci.yml`; `.env.example`; README и local setup.
 
 **База данных.** Initial infrastructure migration с migration journal и единственной служебной таблицей `system_metadata`; проверка соединения. Бизнес-схемы ещё нет.
 
@@ -74,9 +74,9 @@ Milestones 01–10 образуют первый рабочий MVP. Milestones 
 
 **Тесты.** Unit для env/error/redaction/request ID; integration smoke PostgreSQL migration/Redis/S3/Mailpit; component smoke UI; Playwright desktop/mobile и axe smoke; production build и health smoke.
 
-**Команды проверки.** `corepack enable`; `pnpm install --frozen-lockfile`; `pnpm format:check`; `pnpm lint`; `pnpm typecheck`; `pnpm test`; `docker compose -f infra/compose.yaml up -d --wait`; `pnpm db:migrate`; `pnpm test:integration`; `pnpm build`; `pnpm test:e2e`; запуск production web/worker и `pnpm smoke`.
+**Команды проверки.** `corepack enable`; `pnpm install --frozen-lockfile`; `pnpm format:check`; `pnpm lint`; `pnpm typecheck`; `pnpm test`; `docker compose up -d --build --wait`; `pnpm test:integration`; `pnpm build`; `pnpm test:e2e`; запуск production web/worker и `pnpm smoke`.
 
-**Критерии приёмки.** Новый checkout поднимается по README; web и worker healthy; PostgreSQL/Redis/MinIO/Mailpit доступны локально; все команды зелёные в CI; отсутствуют hardcoded domain/secrets; Russian shell корректен на mobile/desktop; production build не требует dev-only service credentials.
+**Критерии приёмки.** Новый checkout поднимается по README одной Compose-командой после создания локального env; migrations применяются до старта приложений; web и worker healthy; PostgreSQL/Redis/MinIO/Mailpit доступны локально; повторный запуск сохраняет volumes; все команды зелёные в CI; отсутствуют hardcoded domain/secrets; Russian shell корректен на mobile/desktop; production build не требует dev-only service credentials.
 
 **Зависимости.** Milestone 00 и подтверждение базового стека.
 
@@ -86,7 +86,7 @@ Milestones 01–10 образуют первый рабочий MVP. Milestones 
 
 **Цель.** Безопасно идентифицировать владельца/клиента и гарантировать изоляцию workspace до появления бизнес-функций.
 
-**Функции.** Bootstrap первого owner; workspace profile (name/logo reference/accent); Better Auth database sessions; email+password для owner; invitation-only magic link для клиента; expiration/revoke/single-use; logout, revoke sessions, disable user; onboarding screen; WorkspaceMembership roles/permission schema; server policy layer; rate limits; audit security events.
+**Функции.** Bootstrap первого owner; workspace profile (name/logo reference/accent); Better Auth database sessions; email+password для owner; одношаговое принятие invitation с server-side Better Auth session issuance; обычный magic link для последующих входов; expiration/revoke/single-use; logout, revoke sessions, disable user; onboarding screen; WorkspaceMembership roles/permission schema; server policy layer; rate limits; audit security events.
 
 **Модули и файлы.** `packages/auth`; `packages/core/src/modules/auth`, `workspaces`, `audit`; auth Route Handlers/pages; workspace settings UI; tenant-aware repository helpers; email outbox stub сохраняет событие, но dev transport выводит безопасный preview без токена в лог.
 

@@ -3,10 +3,11 @@ import { createServer, type ServerResponse } from 'node:http';
 import Redis from 'ioredis';
 
 import { parseWorkerEnv } from '@garun/config';
-import { checkDatabase } from '@garun/db';
+import { checkDatabase, createDatabaseClient } from '@garun/db';
 import { createLogger, getOrCreateRequestId } from '@garun/observability';
 
 import { createWorkerHealthResponse } from './health';
+import { startOutboxDispatcher } from './outbox';
 
 const environment = parseWorkerEnv();
 const logger = createLogger({
@@ -14,6 +15,8 @@ const logger = createLogger({
   level: environment.LOG_LEVEL,
   service: 'worker',
 });
+const database = createDatabaseClient(environment.DATABASE_URL);
+const stopOutbox = startOutboxDispatcher(database.pool, environment, logger);
 
 function sendJson(response: ServerResponse, statusCode: number, body: unknown, requestId: string) {
   response.writeHead(statusCode, {
@@ -80,11 +83,13 @@ server.listen(environment.WORKER_PORT, environment.WORKER_HOST, () => {
 
 function shutdown(signal: NodeJS.Signals) {
   logger.info({ signal }, 'Worker shutdown requested');
+  stopOutbox();
   server.close((error) => {
     if (error) {
       logger.error({ errorCode: 'WORKER_SHUTDOWN_FAILED' }, 'Worker shutdown failed');
       process.exitCode = 1;
     }
+    void database.pool.end();
   });
 }
 

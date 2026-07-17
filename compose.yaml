@@ -1,0 +1,5 @@
+name: garun-workspace-local
+
+include:
+  - path: infra/compose.yaml
+    env_file: infra/.env

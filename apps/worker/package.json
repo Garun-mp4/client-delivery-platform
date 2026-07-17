@@ -15,11 +15,13 @@
   },
   "dependencies": {
     "@garun/config": "workspace:*",
+    "@garun/auth": "workspace:*",
     "@garun/contracts": "workspace:*",
     "@garun/db": "workspace:*",
     "@garun/observability": "workspace:*",
     "drizzle-orm": "catalog:",
     "ioredis": "catalog:",
+    "nodemailer": "catalog:",
     "pg": "catalog:",
     "pino": "catalog:"
   },
@@ -27,6 +29,8 @@
     "@garun/eslint-config": "workspace:*",
     "@garun/typescript-config": "workspace:*",
     "@types/node": "catalog:",
+    "@types/nodemailer": "catalog:",
+    "@types/pg": "catalog:",
     "eslint": "catalog:",
     "tsup": "catalog:",
     "tsx": "catalog:",

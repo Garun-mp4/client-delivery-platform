@@ -1,4 +1,5 @@
 import { connection } from 'next/server';
+import Link from 'next/link';
 
 import { parseProductConfig } from '@garun/config';
 import { Card } from '@garun/ui/card';
@@ -19,8 +20,8 @@ export default async function HomePage() {
           {product.APP_NAME}
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
-          Подготовлены web-приложение, worker, локальные сервисы, миграции и проверки качества.
-          Продуктовые функции появятся в следующих milestones.
+          Безопасное пространство для команды: доступ только по приглашению, управляемые сессии и
+          изоляция данных.
         </p>
         <dl className="mt-8 grid gap-4 border-t border-slate-200 pt-6 sm:grid-cols-2">
           <div>
@@ -29,9 +30,12 @@ export default async function HomePage() {
           </div>
           <div>
             <dt className="text-sm font-medium text-slate-500">Техническое состояние</dt>
-            <dd className="mt-1 font-medium">Готово к проверке health endpoints</dd>
+            <dd className="mt-1 font-medium">Identity и workspace готовы к проверке</dd>
           </div>
         </dl>
+        <Link className="text-link" href="/login">
+          Войти в workspace
+        </Link>
       </Card>
     </main>
   );

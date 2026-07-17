@@ -196,6 +196,44 @@
 **Альтернативы:** один package без workspace; Nx; публикация внутренних пакетов перед сборкой; скачиваемый Playwright Chromium; разрешение всех install scripts.
 **Причина:** границы приложений и shared packages уже оправдывают лёгкую orchestration, но отдельная платформа монорепозитория не нужна. Настройка сохраняет строгий lockfile, запускаемый worker artifact, независимость browser tests от региональной доступности CDN и минимальную поверхность supply-chain scripts.
 
+### ADR-021. Better Auth ограничен identity и session lifecycle
+
+**Решение:** Better Auth 1.6.23 с Drizzle adapter хранит password account владельца, hashed magic-link verification и database-backed sessions. Публичные `sign-up`, прямые password/magic request endpoints отключены; приложение вызывает typed server API через собственные маршруты с одинаковыми пользовательскими ошибками. Cookie cache выключен, поэтому отзыв строки session действует немедленно. Workspace membership, роли и tenant authorization не делегируются auth-библиотеке.
+**Альтернативы:** Better Auth organization/admin plugin; полностью самописная auth; JWT без server-side revocation.
+**Причина:** библиотека закрывает сложный identity lifecycle, но доменные права остаются явными, scoped и тестируемыми.
+
+### ADR-022. TenantContext и deny-by-default RBAC
+
+**Решение:** защищённый запрос разрешает workspace только из проверенной session, активного пользователя, активного membership и server-side slug lookup. `workspaceId` из URL/body/query не становится контекстом. Централизованные policies выдают `owner` полный минимальный набор Milestone 02, а `member` — только `workspace.view`; неизвестное разрешение запрещено. Чужой и отсутствующий workspace отвечают одинаковым `404`.
+**Альтернативы:** фильтр в каждом Route Handler; client-side role checks; RLS сейчас.
+**Причина:** application isolation обязательна уже в MVP, а RLS остаётся отдельным pre-SaaS review.
+
+### ADR-023. Encrypted transactional email outbox без BullMQ в Milestone 02
+
+**Решение:** business transaction создаёт `outbox_event`; raw invitation/magic URL хранится только в AES-256-GCM envelope с отдельным конфигурируемым ключом и очищается после доставки. Worker забирает записи через `FOR UPDATE SKIP LOCKED`, сохраняет workspace context, использует стабильный Message-ID, bounded exponential backoff, восстанавливает stale claims и не логирует recipient/link/token. В Milestone 02 dispatcher опрашивает PostgreSQL напрямую; BullMQ не добавляется до появления нескольких очередей/каналов.
+**Альтернативы:** raw token в JSON payload; синхронный SMTP; PostgreSQL outbox → BullMQ уже сейчас.
+**Причина:** прямой dispatcher сохраняет transactional guarantee и заменяемый email adapter без преждевременной второй очереди.
+
+### ADR-024. Принятие приглашения и вход — два разных одноразовых доказательства
+
+**Решение:** invitation token атомарно создаёт user/membership, после чего система выпускает отдельный Better Auth magic link для session. Invitation token не становится session credential. Повторное, отозванное и истёкшее приглашение безопасно отклоняется. `InvitationProjectGrant` отложен до Milestone 03, потому что в Milestone 02 нет Project entity и разрешены только внутренние workspace invitations.
+**Альтернативы:** создавать session непосредственно invitation token; заранее создавать membership; пустая project-grant таблица без Project FK.
+**Причина:** разделение proof-of-invitation и proof-of-login уменьшает полномочия токена и не создаёт преждевременную проектную модель.
+
+Статус: заменено ADR-025 по подтверждённому UX-решению владельца продукта.
+
+### ADR-025. Одно действие пользователя при принятии приглашения
+
+**Решение:** invitation token по-прежнему атомарно создаёт user/membership и не записывается как session credential. Сразу после успешной транзакции сервер через Better Auth выпускает отдельный hashed verification token, потребляет его внутри того же HTTP flow, устанавливает подписанную session cookie средствами Better Auth и перенаправляет пользователя в workspace. Второе письмо не отправляется. Если session issuance завершится ошибкой после acceptance, membership сохраняется, а пользователь может запросить обычный magic link. Экран ожидания входа может предложить только фиксированные ссылки Gmail, Mail.ru или Яндекс Почты по домену введённого email; автоматического перехода и произвольного webmail URL нет.
+**Альтернативы:** два последовательных письма; превращение invitation token непосредственно в самописную session; автоматический redirect во внешний webmail.
+**Причина:** один клик заметно снижает трение клиента, при этом session создаётся Better Auth, одноразовые secrets остаются hashed, а фиксированный allowlist webmail URL исключает open redirect.
+
+### ADR-026. Единый локальный Compose stack
+
+**Решение:** корневой `compose.yaml` является единственной пользовательской точкой запуска и включает полный локальный stack из `infra/compose.yaml`: PostgreSQL, Redis, MinIO, Mailpit, одноразовый migration service, web и worker. Web/worker используют один общий development image на Node.js 22.22.2/pnpm 11.9.0 и запускаются без root. Migrations завершаются успешно до старта приложений; зависимости и приложения имеют healthchecks; порты публикуются только на loopback; существующее Compose project name и именованные volumes сохраняются. Входные connection strings/secrets имеют Compose-specific `APP_` names, чтобы случайные host env не подменяли container DNS. CI запускает только четыре infrastructure services, поэтому containerized developer flow не дублирует CI host build.
+**Альтернативы:** три ручных терминала; установка host Node/pnpm как обязательное условие просмотра; отдельные Compose-файлы для каждого процесса; production-like multi-stage images уже в Milestone 02.
+**Причина:** одна команда снижает стоимость локального запуска и не меняет production deployment architecture; общий dev image избегает преждевременной упаковки Vercel web и отдельного worker runtime.
+
 ## 5. Планируемая структура репозитория
 
 Каталоги создаются по мере появления рабочего кода, а не пустым scaffold заранее.

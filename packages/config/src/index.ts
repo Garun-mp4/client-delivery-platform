@@ -35,6 +35,32 @@ const redisShape = {
     }),
 } as const;
 
+const identityShape = {
+  BETTER_AUTH_SECRET: z.string().min(32),
+  AUTH_COOKIE_PREFIX: z
+    .string()
+    .regex(/^[a-z0-9-]+$/)
+    .default('garun'),
+  INVITATION_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(72),
+  MAGIC_LINK_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
+  OUTBOX_ENCRYPTION_KEY: z
+    .string()
+    .refine(
+      (value) => Buffer.from(value, 'base64').byteLength === 32,
+      'OUTBOX_ENCRYPTION_KEY must be a base64-encoded 32-byte key',
+    ),
+} as const;
+
+const emailShape = {
+  EMAIL_FROM: z.string().trim().min(3),
+  SMTP_HOST: z.string().trim().min(1).default('127.0.0.1'),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65_535).default(1025),
+  SMTP_SECURE: z
+    .string()
+    .default('false')
+    .transform((value) => value === 'true'),
+} as const;
+
 function validateProductConfig(
   value: z.output<z.ZodObject<typeof sharedServerShape>>,
   context: z.RefinementCtx,
@@ -64,19 +90,48 @@ function validateProductConfig(
 const sharedServerSchema = z.object(sharedServerShape).superRefine(validateProductConfig);
 const databaseSchema = z.object(databaseShape);
 
+function validateIdentityConfig(
+  value: z.output<z.ZodObject<typeof sharedServerShape & typeof identityShape>>,
+  context: z.RefinementCtx,
+) {
+  if (value.APP_ENV !== 'production') return;
+  if (value.BETTER_AUTH_SECRET.includes('local-only') || /^A+$/.test(value.OUTBOX_ENCRYPTION_KEY)) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Production identity secrets must not use documented placeholders',
+      path: ['BETTER_AUTH_SECRET'],
+    });
+  }
+}
+
 const webSchema = z
-  .object({ ...sharedServerShape, ...databaseShape, ...redisShape })
-  .superRefine(validateProductConfig);
+  .object({ ...sharedServerShape, ...databaseShape, ...redisShape, ...identityShape })
+  .superRefine((value, context) => {
+    validateProductConfig(value, context);
+    validateIdentityConfig(value, context);
+  });
 
 const workerSchema = z
   .object({
     ...sharedServerShape,
     ...databaseShape,
     ...redisShape,
+    ...identityShape,
+    ...emailShape,
     WORKER_HOST: z.string().trim().min(1).default('127.0.0.1'),
     WORKER_PORT: z.coerce.number().int().min(1).max(65_535).default(3001),
   })
-  .superRefine(validateProductConfig);
+  .superRefine((value, context) => {
+    validateProductConfig(value, context);
+    validateIdentityConfig(value, context);
+    if (value.APP_ENV === 'production' && value.EMAIL_FROM.endsWith('.invalid>')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Production email sender must not use the local placeholder',
+        path: ['EMAIL_FROM'],
+      });
+    }
+  });
 
 export type AppEnvironment = z.infer<typeof appEnvironmentSchema>;
 export type DatabaseEnvironment = z.infer<typeof databaseSchema>;

@@ -1,12 +1,28 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
-test('shows only the foundation status page', async ({ page }) => {
+test('shows the product entry page', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.getByRole('heading', { name: 'Garun Workspace' })).toBeVisible();
   await expect(page.getByText('Инженерная основа запущена')).toBeVisible();
   await expect(page).toHaveTitle('Garun Workspace');
+});
+
+test('login page has no automatically detectable accessibility violations', async ({ page }) => {
+  await page.goto('/login');
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(results.violations).toEqual([]);
+});
+
+test('offers only a fixed webmail shortcut for a recognized provider', async ({ page }) => {
+  await page.goto('/login/sent?provider=gmail');
+  const shortcut = page.getByRole('link', { name: 'Открыть Gmail' });
+  await expect(shortcut).toHaveAttribute('href', 'https://mail.google.com/');
+  await expect(shortcut).toHaveAttribute('target', '_blank');
+
+  await page.goto('/login/sent?provider=https://evil.example');
+  await expect(page.getByText(/^Открыть /)).toHaveCount(0);
 });
 
 test('foundation page has no automatically detectable accessibility violations', async ({

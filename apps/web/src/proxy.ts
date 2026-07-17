@@ -23,6 +23,16 @@ function createContentSecurityPolicy(nonce: string): string {
 
 export function proxy(request: NextRequest) {
   const requestId = getOrCreateRequestId(request.headers.get('x-request-id'));
+  if (request.method === 'POST') {
+    const configuredOrigin = process.env.PUBLIC_APP_URL ?? 'http://localhost:3000';
+    const origin = request.headers.get('origin');
+    if (!origin || origin !== new URL(configuredOrigin).origin) {
+      return NextResponse.json(
+        { error: { code: 'INVALID_ORIGIN', requestId } },
+        { status: 403, headers: { 'cache-control': 'no-store', 'x-request-id': requestId } },
+      );
+    }
+  }
   const nonce = crypto.randomUUID();
   const contentSecurityPolicy = createContentSecurityPolicy(nonce);
   const requestHeaders = new Headers(request.headers);
