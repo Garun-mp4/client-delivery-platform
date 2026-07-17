@@ -1,9 +1,9 @@
 # Garun Workspace
 
-Client Delivery Platform. **Milestone 04** добавляет согласуемые границы проекта, этапы, действия,
-точный прогресс и отдельные developer/client dashboards поверх компаний, проектов и явных project
-memberships. Identity, database-backed sessions, deny-by-default RBAC, tenant isolation, audit
-trail и transactional outbox сохранены как серверная граница доступа.
+Client Delivery Platform. **Milestone 05** добавляет проектные анкеты с безопасным конструктором,
+conditional/repeating fields, optimistic autosave, immutable revisions и clarification flow поверх
+плана проекта. Identity, deny-by-default RBAC, tenant isolation, audit trail и transactional outbox
+сохранены как серверная граница доступа.
 
 ## Требования
 
@@ -115,13 +115,19 @@ Mailpit и примите приглашение. Одна ссылка созд
 последующих входов. Для Gmail, Mail.ru и Яндекс Почты экран ожидания показывает необязательную
 ссылку на соответствующий webmail, не выполняя автоматический redirect.
 
-Для проверки Milestone 03–04 откройте раздел «Клиенты», создайте компанию, затем в разделе «Проекты»
+Для проверки Milestone 03–05 откройте раздел «Клиенты», создайте компанию, затем в разделе «Проекты»
 создайте черновик. Клиент не видит черновик. После проверки «глазами клиента» опубликуйте проект,
 отправьте приглашение представителю и откройте его письмо в Mailpit. Одна ссылка создаёт клиентский
 доступ и сразу открывает только этот проект. Внутренние заметки в клиентский DTO не входят. Затем
 откройте «План, этапы и действия»: создайте scope, назначьте согласующего клиента, получите
 согласование и добавьте блокирующее клиентское действие. После выполнения действия клиентом
 `blockedByClient` должен исчезнуть, а прогресс должен соответствовать весам этапов.
+
+Затем откройте в карточке проекта «Анкеты», создайте вопросы и назначьте участника клиента. Клиент
+может заполнить часть, дождаться статуса «Сохранено», перезагрузить страницу и продолжить с того же
+места. После отправки разработчик принимает revision или возвращает её с пояснением; повторная
+отправка создаёт новую неизменяемую revision. Черновик до отправки разработчику не показывается.
+File/image-поля намеренно недоступны до безопасного файлового модуля Milestone 06.
 
 Health endpoints возвращают только service/check status и correlation ID. Connection strings,
 credentials и тексты ошибок зависимостей в ответ не включаются.
@@ -220,6 +226,7 @@ packages/
   config/               runtime validation и конфигурируемые defaults
   contracts/            transport DTO/error/health contracts
   core/                 identity, TenantContext, clients/projects policies и application services
+    questionnaires/     schema v1, autosave, immutable submissions и review services
   db/                   Drizzle schema, client и migrations
   observability/        Pino logger, redaction, correlation IDs
   ui/                   базовые доступные UI-компоненты
@@ -261,4 +268,5 @@ transport/composition, а project/client policies и мутации находя
 - `docs/IDENTITY_AND_TENANCY.md` — auth/invitation flows, permissions matrix и ER diagram;
 - `docs/CLIENTS_AND_PROJECTS.md` — компании, проекты, memberships и публикация;
 - `docs/SCOPE_STAGES_ACTIONS.md` — scope agreement, этапы, actions, progress и client next action;
+- `docs/QUESTIONNAIRES.md` — schema, autosave/revision flow, permissions и privacy анкет;
 - `AGENTS.md` — правила работы Codex.

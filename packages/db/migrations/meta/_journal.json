@@ -43,6 +43,20 @@
       "when": 1784279456745,
       "tag": "0005_smiling_kabuki",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784286441940,
+      "tag": "0006_mighty_the_santerians",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784287467958,
+      "tag": "0007_sour_gwen_stacy",
+      "breakpoints": true
     }
   ]
 }

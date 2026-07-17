@@ -23,7 +23,7 @@ function createContentSecurityPolicy(nonce: string): string {
 
 export function proxy(request: NextRequest) {
   const requestId = getOrCreateRequestId(request.headers.get('x-request-id'));
-  if (request.method === 'POST') {
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) {
     const configuredOrigin = process.env.PUBLIC_APP_URL ?? 'http://localhost:3000';
     const origin = request.headers.get('origin');
     if (!origin || origin !== new URL(configuredOrigin).origin) {

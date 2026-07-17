@@ -304,6 +304,50 @@ email; email events по-прежнему требуют encrypted secret.
 **Причина:** UTC-правило воспроизводимо, payload не раскрывает содержание, а единый outbox сохраняет
 надёжную границу для будущих notification consumers без преждевременной инфраструктуры.
 
+### ADR-032. Project-local questionnaire schema snapshot
+
+**Решение:** в Milestone 05 конструктор создаёт анкету непосредственно внутри проекта и сохраняет
+валидированный `schemaSnapshot` версии 1. После открытия анкеты schema не редактируется; изменение
+набора вопросов создаётся отдельной анкетой. Reusable `QuestionnaireTemplate` и библиотека шаблонов
+не создаются до соответствующего milestone. Типы `file`/`image` входят в versioned contract, но
+конструктор не предлагает их до готовности безопасного file subsystem Milestone 06.
+
+**Альтернативы:** редактировать живую schema при уже существующих ответах; создать глобальную
+библиотеку шаблонов заранее; показывать неработающие file controls.
+
+**Причина:** submission всегда однозначно связан с вопросами, которые видел клиент, а продукт не
+получает преждевременный template-management scope или небезопасные файловые заглушки.
+
+### ADR-033. Отдельный optimistic draft и неизменяемые submissions
+
+**Решение:** одна назначенная пользователю `QuestionnaireDraft` хранит mutable answers, монотонный
+`version`, последний idempotency key и время подтверждённого сохранения. Autosave принимает только
+expected version; stale tab получает conflict. Submit под блокировкой анкеты валидирует snapshot,
+отбрасывает условно скрытые ответы и создаёт новую revision. DB trigger запрещает менять schema,
+answers, revision, автора и время submission. Clarification меняет только review state и
+переоткрывает тот же draft для следующей revision.
+
+**Альтернативы:** обновлять submission; last-write-wins; создавать revision при каждом autosave;
+копировать ответы в новый mutable submission при уточнении.
+
+**Причина:** подтверждённый draft не теряется при сетевой ошибке, две вкладки не перетирают данные,
+а история отправок остаётся проверяемой и компактной.
+
+### ADR-034. Server-authoritative conditional validation и answer privacy
+
+**Решение:** порядок полей является частью schema: condition может ссылаться только на предыдущее
+поле, ID уникальны, repeating groups имеют один ограниченный уровень вложенности. Client renderer и
+server validator используют одинаковый versioned contract, но authoritative результат вычисляет
+сервер. Hidden answer не считается обязательным и не входит в submission. Черновик видит только
+назначенный client project member; разработчик получает ответы после submit. Audit/outbox никогда
+не содержат answers или comment body.
+
+**Альтернативы:** доверять client-side validation; сохранять все hidden values в revision; показывать
+разработчику незавершённый draft; помещать snapshot answers в event payload.
+
+**Причина:** условия нельзя обойти подменой запроса, незавершённые персональные данные не раскрываются
+раньше отправки, а служебные каналы не становятся копией содержимого анкеты.
+
 ## 5. Планируемая структура репозитория
 
 Каталоги создаются по мере появления рабочего кода, а не пустым scaffold заранее.

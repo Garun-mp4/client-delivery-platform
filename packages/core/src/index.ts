@@ -13,4 +13,5 @@ export function defineModule<const TModule extends ApplicationModule>(module: TM
 export * from './projects/index';
 
 export * from './identity/index';
+export * from './questionnaires/index';
 export * from './workflow/index';
