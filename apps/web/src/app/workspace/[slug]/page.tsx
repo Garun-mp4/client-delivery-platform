@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { notFound, redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 
@@ -6,6 +6,7 @@ import { can, resolveTenantContext } from '@garun/core/identity';
 import {
   auditEvent,
   invitation,
+  projectMembership,
   session,
   user,
   workspace,
@@ -13,6 +14,7 @@ import {
 } from '@garun/db/schema';
 
 import { auth, database } from '@/lib/server';
+import { WorkspaceNav } from './_components/workspace-nav';
 
 export default async function WorkspacePage({
   params,
@@ -41,6 +43,20 @@ export default async function WorkspacePage({
     .where(eq(workspace.id, tenant.workspaceId))
     .limit(1);
   if (!space) notFound();
+  if (tenant.role !== 'owner') {
+    const [assignedProject] = await database.db
+      .select({ id: projectMembership.id })
+      .from(projectMembership)
+      .where(
+        and(
+          eq(projectMembership.workspaceId, tenant.workspaceId),
+          eq(projectMembership.userId, tenant.userId),
+          isNull(projectMembership.removedAt),
+        ),
+      )
+      .limit(1);
+    if (assignedProject) redirect(`/workspace/${slug}/projects`);
+  }
   const members = await database.db
     .select({
       id: workspaceMembership.id,
@@ -93,6 +109,7 @@ export default async function WorkspacePage({
           </button>
         </form>
       </header>
+      <WorkspaceNav slug={slug} internal={tenant.role === 'owner'} />
       {feedback.success ? (
         <p className="notice success" role="status">
           Изменение сохранено.

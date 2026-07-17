@@ -39,7 +39,9 @@ a {
   color: inherit;
 }
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 button {
@@ -57,6 +59,8 @@ button:hover {
 }
 button:focus-visible,
 input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
 summary:focus-visible,
 a:focus-visible {
   outline: 3px solid #d49b36;
@@ -71,7 +75,9 @@ button.danger {
   background: var(--danger);
   border-color: var(--danger);
 }
-input {
+input,
+select,
+textarea {
   width: 100%;
   min-height: 44px;
   border: 1px solid #aaa99f;
@@ -79,6 +85,9 @@ input {
   padding: 0.65rem 0.75rem;
   background: white;
   color: var(--page-foreground);
+}
+textarea {
+  resize: vertical;
 }
 label {
   font-size: 0.9rem;
@@ -210,6 +219,24 @@ h2 {
   color: var(--muted);
   font-size: 0.85rem;
 }
+.workspace-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+.workspace-nav a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.55rem 0.9rem;
+  background: var(--surface);
+  color: var(--brand-accent);
+  font-weight: 650;
+  text-decoration: none;
+}
 .panel {
   margin-top: 1.25rem;
   border: 1px solid var(--line);
@@ -307,6 +334,100 @@ details form {
   display: flex;
   gap: 0.5rem;
 }
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+.form-grid label {
+  display: grid;
+  gap: 0.45rem;
+}
+.form-grid small,
+.project-grid small {
+  color: var(--muted);
+  font-weight: 400;
+}
+.full-field,
+.form-grid > button {
+  grid-column: 1 / -1;
+}
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  list-style: none;
+  margin: 1.25rem 0 0;
+  padding: 0;
+}
+.project-grid a {
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border: 1px solid var(--line);
+  padding: 1rem;
+  background: white;
+  text-decoration: none;
+}
+.project-grid span,
+.status-pill {
+  color: var(--brand-accent);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.project-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+.member-form {
+  grid-template-columns: minmax(180px, 1fr) auto auto auto;
+}
+.client-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.6fr);
+  gap: 2rem;
+  margin-top: 1.25rem;
+  border: 1px solid var(--line);
+  padding: clamp(1.25rem, 5vw, 3rem);
+  background: var(--surface);
+}
+.client-summary p {
+  color: var(--muted);
+  line-height: 1.65;
+}
+.client-summary dl {
+  margin: 0;
+}
+.client-summary dl div {
+  border-top: 1px solid var(--line);
+  padding: 0.8rem 0;
+}
+.client-summary dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.client-summary dd {
+  margin: 0.25rem 0 0;
+  font-weight: 650;
+}
+.preview-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  border: 1px solid #d49b36;
+  padding: 0.8rem 1rem;
+  background: #fff6df;
+}
+.danger-zone {
+  border-color: #d9b2ac;
+}
 @media (max-width: 640px) {
   .workspace-header,
   .rows > li,
@@ -317,6 +438,16 @@ details form {
   }
   .inline-form {
     grid-template-columns: 1fr;
+  }
+  .form-grid,
+  .project-grid,
+  .client-summary {
+    grid-template-columns: 1fr;
+  }
+  .project-toolbar,
+  .preview-banner {
+    align-items: stretch;
+    flex-direction: column;
   }
   .workspace-header button,
   .rows button {

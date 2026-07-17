@@ -32,10 +32,11 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
   return (
     <main className="auth-shell">
       <section className="auth-card">
-        <p className="eyebrow">Приглашение в команду</p>
-        <h1>Присоединиться к workspace</h1>
+        <p className="eyebrow">Персональное приглашение</p>
+        <h1>Открыть доступ</h1>
         <p className="lede">
-          После подтверждения мы отправим отдельную одноразовую ссылку для безопасного входа.
+          После подтверждения мы создадим доступ и безопасно откроем назначенное рабочее
+          пространство или проект. Дополнительное письмо не потребуется.
         </p>
         <form action="/api/invitations/accept" method="post">
           <input type="hidden" name="token" value={token} />

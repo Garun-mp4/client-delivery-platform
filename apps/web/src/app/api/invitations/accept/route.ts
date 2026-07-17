@@ -42,7 +42,9 @@ export async function POST(request: Request) {
   try {
     return await createInvitationSessionResponse(database.db, environment, {
       email: acceptedIdentity.email,
-      callbackURL: `/workspace/${acceptedIdentity.workspaceSlug}`,
+      callbackURL: accepted.projectSlug
+        ? `/workspace/${acceptedIdentity.workspaceSlug}/projects/${accepted.projectSlug}`
+        : `/workspace/${acceptedIdentity.workspaceSlug}`,
       headers: new Headers(request.headers),
     });
   } catch {
