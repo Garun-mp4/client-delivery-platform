@@ -64,6 +64,45 @@ export const projectMembershipRole = pgEnum('project_membership_role', [
   'client',
   'observer',
 ]);
+export const scopeRevisionStatus = pgEnum('scope_revision_status', [
+  'draft',
+  'client_review',
+  'agreed',
+  'superseded',
+]);
+export const scopeDecisionType = pgEnum('scope_decision_type', ['agreed', 'changes_requested']);
+export const projectStageStatus = pgEnum('project_stage_status', [
+  'not_started',
+  'in_progress',
+  'waiting_for_client',
+  'ready_for_review',
+  'changes_requested',
+  'approved',
+  'skipped',
+]);
+export const actionItemType = pgEnum('action_item_type', [
+  'upload_material',
+  'answer_question',
+  'review_version',
+  'approve_stage',
+  'make_payment',
+  'fix_feedback',
+  'internal',
+  'other',
+]);
+export const actionItemStatus = pgEnum('action_item_status', [
+  'open',
+  'in_progress',
+  'done',
+  'cancelled',
+]);
+export const actionItemPriority = pgEnum('action_item_priority', [
+  'low',
+  'normal',
+  'high',
+  'urgent',
+]);
+export const actionItemVisibility = pgEnum('action_item_visibility', ['internal', 'client']);
 
 // Better Auth core model. Application code always writes a normalized lowercase email.
 export const user = pgTable(
@@ -303,6 +342,8 @@ export const project = pgTable(
     plannedStartDate: date('planned_start_date', { mode: 'string' }).notNull(),
     plannedEndDate: date('planned_end_date', { mode: 'string' }).notNull(),
     clientAccessMode: text('client_access_mode').notNull().default('explicit_grants'),
+    progressCompletedWeight: integer('progress_completed_weight').notNull().default(0),
+    progressTotalWeight: integer('progress_total_weight').notNull().default(0),
     publishedAt: timestamp('published_at', { withTimezone: true, mode: 'date' }),
     archivedAt: timestamp('archived_at', { withTimezone: true, mode: 'date' }),
     ...timestamps,
@@ -324,8 +365,275 @@ export const project = pgTable(
     index('project_company_status_idx').on(table.clientCompanyId, table.status),
     check('project_planned_dates_check', sql`${table.plannedEndDate} >= ${table.plannedStartDate}`),
     check(
+      'project_progress_weights_check',
+      sql`${table.progressCompletedWeight} >= 0 AND ${table.progressTotalWeight} >= 0 AND ${table.progressCompletedWeight} <= ${table.progressTotalWeight}`,
+    ),
+    check(
       'project_archive_state_check',
       sql`(${table.status} = 'archived' AND ${table.statusBeforeArchive} IS NOT NULL AND ${table.statusBeforeArchive} <> 'archived') OR (${table.status} <> 'archived' AND ${table.statusBeforeArchive} IS NULL)`,
+    ),
+  ],
+);
+
+export const projectScopeRevision = pgTable(
+  'project_scope_revision',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    revision: integer('revision').notNull(),
+    status: scopeRevisionStatus('status').notNull().default('draft'),
+    summary: text('summary').notNull(),
+    goals: jsonb('goals').$type<string[]>().notNull().default([]),
+    audience: jsonb('audience').$type<string[]>().notNull().default([]),
+    pages: jsonb('pages').$type<string[]>().notNull().default([]),
+    features: jsonb('features').$type<string[]>().notNull().default([]),
+    integrations: jsonb('integrations').$type<string[]>().notNull().default([]),
+    deliverables: jsonb('deliverables').$type<string[]>().notNull().default([]),
+    responsibilities: jsonb('responsibilities').$type<string[]>().notNull().default([]),
+    revisionLimits: jsonb('revision_limits').$type<string[]>().notNull().default([]),
+    exclusions: jsonb('exclusions').$type<string[]>().notNull().default([]),
+    assumptions: jsonb('assumptions').$type<string[]>().notNull().default([]),
+    acceptanceCriteria: jsonb('acceptance_criteria').$type<string[]>().notNull().default([]),
+    contractUrl: text('contract_url'),
+    proposalUrl: text('proposal_url'),
+    plannedStartDate: date('planned_start_date', { mode: 'string' }),
+    plannedEndDate: date('planned_end_date', { mode: 'string' }),
+    costMinor: bigint('cost_minor', { mode: 'number' }),
+    currency: text('currency'),
+    createdByUserId: uuid('created_by_user_id').notNull(),
+    submittedAt: timestamp('submitted_at', { withTimezone: true, mode: 'date' }),
+    agreedByUserId: uuid('agreed_by_user_id'),
+    agreedAt: timestamp('agreed_at', { withTimezone: true, mode: 'date' }),
+    supersededAt: timestamp('superseded_at', { withTimezone: true, mode: 'date' }),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [project.id, project.workspaceId],
+      name: 'scope_revision_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.createdByUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'scope_revision_creator_workspace_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('scope_revision_project_revision_unique').on(table.projectId, table.revision),
+    uniqueIndex('scope_revision_id_workspace_unique').on(table.id, table.workspaceId),
+    uniqueIndex('scope_revision_id_project_workspace_unique').on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
+    index('scope_revision_project_status_idx').on(table.projectId, table.status),
+    check('scope_revision_positive_revision_check', sql`${table.revision} > 0`),
+    check(
+      'scope_revision_dates_check',
+      sql`${table.plannedStartDate} IS NULL OR ${table.plannedEndDate} IS NULL OR ${table.plannedEndDate} >= ${table.plannedStartDate}`,
+    ),
+    check(
+      'scope_revision_cost_currency_check',
+      sql`(${table.costMinor} IS NULL AND ${table.currency} IS NULL) OR (${table.costMinor} >= 0 AND char_length(${table.currency}) = 3)`,
+    ),
+    check(
+      'scope_revision_state_timestamps_check',
+      sql`(${table.status} = 'draft' AND ${table.submittedAt} IS NULL AND ${table.agreedAt} IS NULL AND ${table.supersededAt} IS NULL) OR (${table.status} = 'client_review' AND ${table.submittedAt} IS NOT NULL AND ${table.agreedAt} IS NULL AND ${table.supersededAt} IS NULL) OR (${table.status} = 'agreed' AND ${table.submittedAt} IS NOT NULL AND ${table.agreedAt} IS NOT NULL AND ${table.agreedByUserId} IS NOT NULL AND ${table.supersededAt} IS NULL) OR (${table.status} = 'superseded' AND ${table.supersededAt} IS NOT NULL)`,
+    ),
+  ],
+);
+
+export const scopeRevisionApprover = pgTable(
+  'scope_revision_approver',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    scopeRevisionId: uuid('scope_revision_id').notNull(),
+    userId: uuid('user_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.scopeRevisionId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        projectScopeRevision.id,
+        projectScopeRevision.projectId,
+        projectScopeRevision.workspaceId,
+      ],
+      name: 'scope_approver_revision_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [project.id, project.workspaceId],
+      name: 'scope_approver_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.userId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'scope_approver_user_workspace_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('scope_approver_revision_user_unique').on(table.scopeRevisionId, table.userId),
+    uniqueIndex('scope_approver_revision_user_workspace_unique').on(
+      table.scopeRevisionId,
+      table.userId,
+      table.workspaceId,
+    ),
+    uniqueIndex('scope_approver_revision_user_project_workspace_unique').on(
+      table.scopeRevisionId,
+      table.userId,
+      table.projectId,
+      table.workspaceId,
+    ),
+    index('scope_approver_user_idx').on(table.workspaceId, table.userId),
+  ],
+);
+
+export const scopeApprovalDecision = pgTable(
+  'scope_approval_decision',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    scopeRevisionId: uuid('scope_revision_id').notNull(),
+    approverUserId: uuid('approver_user_id').notNull(),
+    decision: scopeDecisionType('decision').notNull(),
+    comment: text('comment'),
+    decidedAt: timestamp('decided_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.scopeRevisionId, table.approverUserId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        scopeRevisionApprover.scopeRevisionId,
+        scopeRevisionApprover.userId,
+        scopeRevisionApprover.projectId,
+        scopeRevisionApprover.workspaceId,
+      ],
+      name: 'scope_decision_assigned_approver_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [project.id, project.workspaceId],
+      name: 'scope_decision_project_workspace_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('scope_decision_revision_approver_unique').on(
+      table.scopeRevisionId,
+      table.approverUserId,
+    ),
+    index('scope_decision_project_created_idx').on(table.projectId, table.createdAt),
+  ],
+);
+
+export const projectStage = pgTable(
+  'project_stage',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    name: text('name').notNull(),
+    description: text('description'),
+    orderIndex: integer('order_index').notNull(),
+    weight: integer('weight').notNull(),
+    status: projectStageStatus('status').notNull().default('not_started'),
+    ownerUserId: uuid('owner_user_id').notNull(),
+    clientVisible: boolean('client_visible').notNull().default(true),
+    isRequired: boolean('is_required').notNull().default(true),
+    countsTowardProgress: boolean('counts_toward_progress').notNull().default(true),
+    plannedStartDate: date('planned_start_date', { mode: 'string' }).notNull(),
+    plannedEndDate: date('planned_end_date', { mode: 'string' }).notNull(),
+    actualStartAt: timestamp('actual_start_at', { withTimezone: true, mode: 'date' }),
+    actualEndAt: timestamp('actual_end_at', { withTimezone: true, mode: 'date' }),
+    acceptanceCriteria: text('acceptance_criteria'),
+    resultSummary: text('result_summary'),
+    skipReason: text('skip_reason'),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [project.id, project.workspaceId],
+      name: 'project_stage_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.ownerUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'project_stage_owner_workspace_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('project_stage_project_order_unique').on(table.projectId, table.orderIndex),
+    uniqueIndex('project_stage_id_project_workspace_unique').on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
+    index('project_stage_project_status_idx').on(table.projectId, table.status),
+    check('project_stage_positive_weight_check', sql`${table.weight} > 0`),
+    check('project_stage_nonnegative_order_check', sql`${table.orderIndex} >= 0`),
+    check('project_stage_dates_check', sql`${table.plannedEndDate} >= ${table.plannedStartDate}`),
+    check(
+      'project_stage_skip_reason_check',
+      sql`${table.status} <> 'skipped' OR nullif(btrim(${table.skipReason}), '') IS NOT NULL`,
+    ),
+    check(
+      'project_stage_review_result_check',
+      sql`${table.status} NOT IN ('ready_for_review', 'approved') OR nullif(btrim(${table.resultSummary}), '') IS NOT NULL`,
+    ),
+  ],
+);
+
+export const actionItem = pgTable(
+  'action_item',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    stageId: uuid('stage_id'),
+    title: text('title').notNull(),
+    description: text('description'),
+    type: actionItemType('type').notNull().default('other'),
+    status: actionItemStatus('status').notNull().default('open'),
+    priority: actionItemPriority('priority').notNull().default('normal'),
+    visibility: actionItemVisibility('visibility').notNull(),
+    assigneeUserId: uuid('assignee_user_id').notNull(),
+    createdByUserId: uuid('created_by_user_id').notNull(),
+    dueAt: timestamp('due_at', { withTimezone: true, mode: 'date' }).notNull(),
+    isBlocking: boolean('is_blocking').notNull().default(false),
+    completedAt: timestamp('completed_at', { withTimezone: true, mode: 'date' }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true, mode: 'date' }),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [project.id, project.workspaceId],
+      name: 'action_item_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.stageId, table.projectId, table.workspaceId],
+      foreignColumns: [projectStage.id, projectStage.projectId, projectStage.workspaceId],
+      name: 'action_item_stage_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.assigneeUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'action_item_assignee_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.createdByUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'action_item_creator_workspace_fk',
+    }).onDelete('cascade'),
+    index('action_item_assignee_status_due_idx').on(
+      table.workspaceId,
+      table.assigneeUserId,
+      table.status,
+      table.dueAt,
+    ),
+    index('action_item_project_status_due_idx').on(table.projectId, table.status, table.dueAt),
+    check(
+      'action_item_terminal_timestamps_check',
+      sql`(${table.status} = 'done' AND ${table.completedAt} IS NOT NULL AND ${table.cancelledAt} IS NULL) OR (${table.status} = 'cancelled' AND ${table.cancelledAt} IS NOT NULL AND ${table.completedAt} IS NULL) OR (${table.status} IN ('open', 'in_progress') AND ${table.completedAt} IS NULL AND ${table.cancelledAt} IS NULL)`,
     ),
   ],
 );
@@ -428,6 +736,9 @@ export interface AuditMetadata {
   readonly reasonCode?: string;
   readonly source?: string;
   readonly targetUserId?: string;
+  readonly fromStatus?: string;
+  readonly toStatus?: string;
+  readonly revision?: number;
 }
 
 export const auditEvent = pgTable(
@@ -450,9 +761,11 @@ export const auditEvent = pgTable(
 );
 
 export interface OutboxPayload {
-  readonly template: 'workspace-invitation' | 'project-invitation' | 'magic-link';
+  readonly template: 'workspace-invitation' | 'project-invitation' | 'magic-link' | 'domain-event';
   readonly recipientUserId?: string;
   readonly invitationId?: string;
+  readonly projectId?: string;
+  readonly entityType?: string;
 }
 
 export const outboxEvent = pgTable(

@@ -39,6 +39,7 @@ export async function POST(
         projectSlug,
         projectRole,
         companyRole,
+        canApprove: form.get('canApprove') === 'yes',
         appUrl: environment.PUBLIC_APP_URL,
         encryptionKey: environment.OUTBOX_ENCRYPTION_KEY,
         ttlHours: environment.INVITATION_TTL_HOURS,

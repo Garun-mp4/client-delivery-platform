@@ -29,6 +29,7 @@ export async function createClientProjectInvitation(
     projectSlug: string;
     projectRole: 'client' | 'observer';
     companyRole: 'primary' | 'member';
+    canApprove: boolean;
     appUrl: string;
     encryptionKey: string;
     ttlHours: number;
@@ -70,6 +71,7 @@ export async function createClientProjectInvitation(
       workspaceId: tenant.workspaceId,
       clientCompanyId: target.companyId,
       role: input.companyRole,
+      canApprove: input.canApprove,
     });
     await tx.insert(invitationProjectGrant).values({
       invitationId: created.id,

@@ -254,4 +254,6 @@ transport/composition, а project/client policies и мутации находя
 - `docs/DECISIONS.md` — текущие архитектурные решения;
 - `docs/STATUS.md` — фактическое состояние реализации;
 - `docs/IDENTITY_AND_TENANCY.md` — auth/invitation flows, permissions matrix и ER diagram;
+- `docs/CLIENTS_AND_PROJECTS.md` — компании, проекты, memberships и публикация;
+- `docs/SCOPE_STAGES_ACTIONS.md` — scope agreement, этапы, actions, progress и client next action;
 - `AGENTS.md` — правила работы Codex.

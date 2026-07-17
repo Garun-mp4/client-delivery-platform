@@ -47,6 +47,14 @@ function ClientProjectView({
         <span className="status-pill">{projectStatusLabels[item.status]}</span>
       </header>
       <WorkspaceNav slug={workspaceSlug} internal={false} />
+      <p>
+        <Link
+          className="provider-link"
+          href={`/workspace/${workspaceSlug}/projects/${slug}/workflow`}
+        >
+          Открыть план и действия
+        </Link>
+      </p>
       {item.status === 'archived' ? (
         <p className="notice" role="status">
           Проект находится в архиве и доступен только для чтения.
@@ -141,6 +149,12 @@ export default async function ProjectPage({
         </p>
       ) : null}
       <div className="project-toolbar">
+        <Link
+          className="provider-link"
+          href={`/workspace/${slug}/projects/${projectSlug}/workflow`}
+        >
+          План, этапы и действия
+        </Link>
         <Link
           className="provider-link"
           href={`/workspace/${slug}/projects/${projectSlug}?preview=client`}
@@ -340,6 +354,10 @@ export default async function ProjectPage({
                 <option value="client">Участник клиента</option>
                 <option value="observer">Только просмотр</option>
               </select>
+            </label>
+            <label className="confirm-control">
+              <input name="canApprove" type="checkbox" value="yes" />
+              Может согласовывать границы проекта
             </label>
             <button type="submit">Отправить приглашение</button>
           </form>
