@@ -49,7 +49,7 @@ test('owner publishes one project and grants then revokes explicit client access
   await expect(page).toHaveURL(/\/workspace\/e2e-studio/);
 
   await page.goto('/workspace/e2e-studio/clients');
-  await page.getByText('Создать компанию', { exact: true }).click();
+  await page.locator('summary').filter({ hasText: 'Создать компанию' }).click();
   await page.getByLabel('Название компании').fill(companyName);
   await page.getByLabel('Email', { exact: true }).fill(clientEmail);
   await page.getByLabel('Внутренние заметки').fill(internalNote);
@@ -57,7 +57,7 @@ test('owner publishes one project and grants then revokes explicit client access
   await expect(page.getByRole('heading', { name: companyName })).toBeVisible();
 
   await page.goto('/workspace/e2e-studio/projects');
-  await page.getByText('Создать черновик', { exact: true }).click();
+  await page.locator('summary').filter({ hasText: 'Создать черновик' }).click();
   await page.getByLabel('Название проекта').fill(projectName);
   await page.getByLabel('Адрес проекта').fill(projectSlug);
   await page.getByLabel('Компания клиента').selectOption({ label: companyName });
@@ -75,7 +75,7 @@ test('owner publishes one project and grants then revokes explicit client access
   await page.getByLabel('Показывать приглашённым клиентам').check();
   await page.getByRole('button', { name: 'Опубликовать проект' }).click();
   await expect(page.getByText('Операция выполнена.')).toBeVisible();
-  await page.getByText('Пригласить представителя клиента', { exact: true }).click();
+  await page.locator('summary').filter({ hasText: 'Пригласить представителя клиента' }).click();
   await page.getByLabel('Email клиента').fill(clientEmail);
   await page.getByLabel('Может согласовывать границы проекта').check();
   await page.getByRole('button', { name: 'Отправить приглашение' }).click();
@@ -145,7 +145,7 @@ test('owner publishes one project and grants then revokes explicit client access
   expect(accessibility.violations).toEqual([]);
 
   await page.goto(`/workspace/e2e-studio/projects/${projectSlug}`);
-  await page.getByText('Участники проекта', { exact: true }).click();
+  await page.locator('summary').filter({ hasText: 'Участники проекта' }).click();
   await page.getByLabel('Подтверждаю отзыв доступа').check();
   await page.getByRole('button', { name: 'Удалить из проекта' }).click();
   await expect(page.getByText('Операция выполнена.')).toBeVisible();

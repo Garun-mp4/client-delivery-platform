@@ -1,18 +1,12 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
 
 import { can, isOwner } from '@garun/core/identity';
-import {
-  invitation,
-  projectMembership,
-  session,
-  user,
-  workspace,
-  workspaceMembership,
-} from '@garun/db/schema';
+import { invitation, session, user, workspace, workspaceMembership } from '@garun/db/schema';
 
 import { requireTenantPage } from '@/lib/page-tenant';
 import { database } from '@/lib/server';
+import { SubmitButton } from '@/app/_components/submit-button';
 
 export default async function WorkspacePage({
   params,
@@ -30,20 +24,6 @@ export default async function WorkspacePage({
     .where(eq(workspace.id, tenant.workspaceId))
     .limit(1);
   if (!space) notFound();
-  if (!owner) {
-    const [assignedProject] = await database.db
-      .select({ id: projectMembership.id })
-      .from(projectMembership)
-      .where(
-        and(
-          eq(projectMembership.workspaceId, tenant.workspaceId),
-          eq(projectMembership.userId, tenant.userId),
-          isNull(projectMembership.removedAt),
-        ),
-      )
-      .limit(1);
-    if (!assignedProject) notFound();
-  }
   const members = owner
     ? await database.db
         .select({
@@ -149,9 +129,9 @@ export default async function WorkspacePage({
                           <input name="confirm" type="checkbox" value="yes" required />
                           Подтверждаю отключение
                         </label>
-                        <button className="danger" type="submit">
+                        <SubmitButton className="danger" pendingText="Отключаем…">
                           Отключить доступ
-                        </button>
+                        </SubmitButton>
                       </form>
                       <form
                         action={`/api/workspaces/${slug}/members/${member.id}/revoke-sessions`}
@@ -161,9 +141,9 @@ export default async function WorkspacePage({
                           <input name="confirm" type="checkbox" value="yes" required />
                           Подтверждаю завершение сеансов
                         </label>
-                        <button className="secondary" type="submit">
+                        <SubmitButton className="secondary" pendingText="Завершаем…">
                           Завершить сеансы
-                        </button>
+                        </SubmitButton>
                       </form>
                     </details>
                   ) : null}
@@ -186,7 +166,7 @@ export default async function WorkspacePage({
               <label htmlFor="invite-email">Email участника</label>
               <input id="invite-email" name="email" type="email" required />
             </div>
-            <button type="submit">Отправить приглашение</button>
+            <SubmitButton pendingText="Готовим приглашение…">Отправить приглашение</SubmitButton>
           </form>
           {invitations.length === 0 ? (
             <p className="empty">Активных и недавних приглашений пока нет.</p>
@@ -206,9 +186,9 @@ export default async function WorkspacePage({
                         action={`/api/workspaces/${slug}/invitations/${item.id}/resend`}
                         method="post"
                       >
-                        <button className="secondary" type="submit">
+                        <SubmitButton className="secondary" pendingText="Отправляем повторно…">
                           Повторить
-                        </button>
+                        </SubmitButton>
                       </form>
                       <form
                         action={`/api/workspaces/${slug}/invitations/${item.id}/revoke`}
@@ -218,9 +198,9 @@ export default async function WorkspacePage({
                           <input name="confirm" type="checkbox" value="yes" required />
                           Подтвердить отзыв
                         </label>
-                        <button className="danger" type="submit">
+                        <SubmitButton className="danger" pendingText="Отзываем…">
                           Отозвать
-                        </button>
+                        </SubmitButton>
                       </form>
                     </span>
                   ) : null}
@@ -248,9 +228,9 @@ export default async function WorkspacePage({
                   <input name="confirm" type="checkbox" value="yes" required />
                   Подтвердить
                 </label>
-                <button className="secondary" type="submit">
+                <SubmitButton className="secondary" pendingText="Отзываем…">
                   Отозвать
-                </button>
+                </SubmitButton>
               </form>
             </li>
           ))}

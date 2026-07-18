@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
+import { SubmitButton } from '@/app/_components/submit-button';
+
 interface AppShellProps {
   readonly children: ReactNode;
   readonly userName: string;
@@ -49,9 +51,9 @@ export function AppShell({
         </Link>
         <span>{workspaceName}</span>
         <form action="/api/logout" method="post">
-          <button className="button-link" type="submit">
+          <SubmitButton className="button-link" pendingText="Выходим…">
             Выйти
-          </button>
+          </SubmitButton>
         </form>
       </header>
       <aside className="app-sidebar">
@@ -73,9 +75,9 @@ export function AppShell({
             <span>{userEmail}</span>
           </div>
           <form action="/api/logout" method="post">
-            <button className="button-link" type="submit">
+            <SubmitButton className="button-link" pendingText="Выходим…">
               Выйти
-            </button>
+            </SubmitButton>
           </form>
         </div>
       </aside>

@@ -368,7 +368,10 @@ export default async function ProjectPage({
       {!archived &&
       item.status !== 'draft' &&
       canAccessProject(access, 'project.members.manage') ? (
-        <details className="panel disclosure-panel">
+        <details
+          className="panel disclosure-panel"
+          open={feedback.success === 'invited' || feedback.error === 'invite'}
+        >
           <summary>
             <span className="disclosure-title">
               <small>КЛИЕНТСКИЙ ДОСТУП</small>

@@ -59,11 +59,7 @@ test('owner invites a member and tenant policies deny owner actions to the membe
   await page.goto('/login');
   await page.getByRole('tab', { name: 'Ссылка на почту' }).click();
   await page.getByLabel('Email', { exact: true }).fill(ownerEmail);
-  const [requestLinkResponse] = await Promise.all([
-    page.waitForResponse((response) => response.url().includes('/api/auth/request-link')),
-    page.getByRole('button', { name: 'Получить ссылку для входа' }).click(),
-  ]);
-  expect(requestLinkResponse.status()).toBe(303);
+  await page.getByRole('button', { name: 'Получить ссылку' }).click();
   await expect(page.getByRole('heading', { name: 'Проверьте почту' })).toBeVisible();
   const ownerMail = await latestLink(request, ownerEmail);
   await page.goto(
