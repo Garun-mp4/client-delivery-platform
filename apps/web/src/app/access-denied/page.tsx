@@ -1,7 +1,9 @@
 import Link from 'next/link';
+import { SubmitButton } from '@/app/_components/submit-button';
+
 export default function AccessDeniedPage() {
   return (
-    <main className="auth-shell">
+    <main className="auth-shell" id="main-content">
       <section className="auth-card">
         <p className="eyebrow">Доступ закрыт</p>
         <h1>Нет активного пространства</h1>
@@ -9,7 +11,7 @@ export default function AccessDeniedPage() {
           Ваша сессия действительна, но активное участие в workspace не найдено.
         </p>
         <form action="/api/logout" method="post">
-          <button type="submit">Выйти</button>
+          <SubmitButton pendingText="Выходим…">Выйти</SubmitButton>
         </form>
         <Link className="text-link" href="/login">
           Вернуться ко входу

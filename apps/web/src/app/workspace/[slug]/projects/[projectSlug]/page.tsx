@@ -17,6 +17,7 @@ import { getProjectWorkflow } from '@garun/core/workflow';
 import { ProjectNav } from './_components/project-nav';
 import { ProjectRoute } from './_components/project-route';
 import { projectStatusLabels, projectTypeLabels } from '../project-copy';
+import { SubmitButton } from '@/app/_components/submit-button';
 import { requireTenantPage } from '@/lib/page-tenant';
 import { database } from '@/lib/server';
 
@@ -177,7 +178,7 @@ export default async function ProjectPage({
               <input name="confirm" type="checkbox" value="yes" required />
               Показывать приглашённым клиентам
             </label>
-            <button type="submit">Опубликовать проект</button>
+            <SubmitButton pendingText="Публикуем…">Опубликовать проект</SubmitButton>
           </form>
         ) : null}
       </div>
@@ -198,242 +199,268 @@ export default async function ProjectPage({
         }
         status={projectStatusLabels[item.status]}
       />
-      <section className="panel" aria-labelledby="project-data-title">
-        <p className="eyebrow">Параметры</p>
-        <h2 id="project-data-title">Карточка проекта</h2>
-        <form
-          className="form-grid"
-          action={`/api/workspaces/${slug}/projects/${projectSlug}`}
-          method="post"
-        >
-          <label>
-            Название
-            <input name="name" defaultValue={item.name} required disabled={archived} />
-          </label>
-          <label>
-            Адрес проекта
-            <input
-              name="slug"
-              defaultValue={item.slug}
-              required
-              pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-              disabled={archived}
-            />
-          </label>
-          <label>
-            Компания
-            <select name="clientCompanyId" defaultValue={item.clientCompanyId} disabled={archived}>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Тип
-            <select name="projectType" defaultValue={item.projectType} disabled={archived}>
-              {Object.entries(projectTypeLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Ответственный
-            <select name="ownerUserId" defaultValue={item.ownerUserId} disabled={archived}>
-              {workspaceMembers.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Плановое начало
-            <input
-              name="plannedStartDate"
-              type="date"
-              defaultValue={item.plannedStartDate}
-              disabled={archived}
-            />
-          </label>
-          <label>
-            Плановое завершение
-            <input
-              name="plannedEndDate"
-              type="date"
-              defaultValue={item.plannedEndDate}
-              disabled={archived}
-            />
-          </label>
-          <label className="full-field">
-            Описание
-            <textarea
-              name="description"
-              rows={5}
-              defaultValue={item.description ?? ''}
-              disabled={archived}
-            />
-          </label>
-          {!archived && canAccessProject(access, 'project.edit') ? (
-            <button type="submit">Сохранить проект</button>
-          ) : null}
-        </form>
-      </section>
-      <section className="panel" aria-labelledby="project-members-title">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Доступ</p>
-            <h2 id="project-members-title">Участники проекта</h2>
-          </div>
-          <span className="count">{members.length}</span>
-        </div>
-        <ul className="compact-list">
-          {members.map((member) => (
-            <li key={member.id}>
-              <span>
-                <strong>{member.name}</strong>
-                <small>{member.email}</small>
-              </span>
-              <span>
-                {member.side === 'internal'
-                  ? 'Команда'
-                  : member.role === 'observer'
-                    ? 'Наблюдатель'
-                    : 'Клиент'}
-                {!archived &&
-                member.role !== 'owner' &&
-                canAccessProject(access, 'project.members.manage') ? (
-                  <form
-                    action={`/api/workspaces/${slug}/projects/${projectSlug}/members/${member.id}/remove`}
-                    method="post"
-                  >
-                    <label className="confirm-control">
-                      <input name="confirm" type="checkbox" value="yes" required />
-                      Подтверждаю отзыв доступа
-                    </label>
-                    <button className="danger" type="submit">
-                      Удалить из проекта
-                    </button>
-                  </form>
-                ) : null}
-              </span>
-            </li>
-          ))}
-        </ul>
-        {!archived &&
-        candidates.length > 0 &&
-        canAccessProject(access, 'project.members.manage') ? (
+      <details className="panel disclosure-panel">
+        <summary>
+          <span className="disclosure-title">
+            <small>ПАРАМЕТРЫ</small>
+            <span id="project-data-title">Карточка проекта</span>
+          </span>
+        </summary>
+        <div className="disclosure-body">
           <form
-            className="inline-form member-form"
-            action={`/api/workspaces/${slug}/projects/${projectSlug}/members`}
+            className="form-grid"
+            action={`/api/workspaces/${slug}/projects/${projectSlug}`}
             method="post"
           >
             <label>
-              Участник команды
-              <select name="userId" required>
-                {candidates.map((member) => (
+              Название
+              <input name="name" defaultValue={item.name} required disabled={archived} />
+            </label>
+            <label>
+              Адрес проекта
+              <input
+                name="slug"
+                defaultValue={item.slug}
+                required
+                pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                disabled={archived}
+              />
+            </label>
+            <label>
+              Компания
+              <select
+                name="clientCompanyId"
+                defaultValue={item.clientCompanyId}
+                disabled={archived}
+              >
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Тип
+              <select name="projectType" defaultValue={item.projectType} disabled={archived}>
+                {Object.entries(projectTypeLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Ответственный
+              <select name="ownerUserId" defaultValue={item.ownerUserId} disabled={archived}>
+                {workspaceMembers.map((member) => (
                   <option key={member.id} value={member.id}>
                     {member.name}
                   </option>
                 ))}
               </select>
             </label>
-            <label className="confirm-control">
-              <input name="canEdit" type="checkbox" value="yes" />
-              Может редактировать и публиковать
+            <label>
+              Плановое начало
+              <input
+                name="plannedStartDate"
+                type="date"
+                defaultValue={item.plannedStartDate}
+                disabled={archived}
+              />
             </label>
-            <label className="confirm-control">
-              <input name="canManageMembers" type="checkbox" value="yes" />
-              Может управлять доступом
+            <label>
+              Плановое завершение
+              <input
+                name="plannedEndDate"
+                type="date"
+                defaultValue={item.plannedEndDate}
+                disabled={archived}
+              />
             </label>
-            <button type="submit">Добавить в проект</button>
+            <label className="full-field">
+              Описание
+              <textarea
+                name="description"
+                rows={5}
+                defaultValue={item.description ?? ''}
+                disabled={archived}
+              />
+            </label>
+            {!archived && canAccessProject(access, 'project.edit') ? (
+              <SubmitButton pendingText="Сохраняем проект…">Сохранить проект</SubmitButton>
+            ) : null}
           </form>
-        ) : null}
-      </section>
+        </div>
+      </details>
+      <details className="panel disclosure-panel">
+        <summary>
+          <span className="disclosure-title">
+            <small>ДОСТУП · {members.length}</small>
+            <span id="project-members-title">Участники проекта</span>
+          </span>
+        </summary>
+        <div className="disclosure-body">
+          <ul className="compact-list">
+            {members.map((member) => (
+              <li key={member.id}>
+                <span>
+                  <strong>{member.name}</strong>
+                  <small>{member.email}</small>
+                </span>
+                <span>
+                  {member.side === 'internal'
+                    ? 'Команда'
+                    : member.role === 'observer'
+                      ? 'Наблюдатель'
+                      : 'Клиент'}
+                  {!archived &&
+                  member.role !== 'owner' &&
+                  canAccessProject(access, 'project.members.manage') ? (
+                    <form
+                      action={`/api/workspaces/${slug}/projects/${projectSlug}/members/${member.id}/remove`}
+                      method="post"
+                    >
+                      <label className="confirm-control">
+                        <input name="confirm" type="checkbox" value="yes" required />
+                        Подтверждаю отзыв доступа
+                      </label>
+                      <SubmitButton className="danger" pendingText="Отзываем доступ…">
+                        Удалить из проекта
+                      </SubmitButton>
+                    </form>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {!archived &&
+          candidates.length > 0 &&
+          canAccessProject(access, 'project.members.manage') ? (
+            <form
+              className="inline-form member-form"
+              action={`/api/workspaces/${slug}/projects/${projectSlug}/members`}
+              method="post"
+            >
+              <label>
+                Участник команды
+                <select name="userId" required>
+                  {candidates.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="confirm-control">
+                <input name="canEdit" type="checkbox" value="yes" />
+                Может редактировать и публиковать
+              </label>
+              <label className="confirm-control">
+                <input name="canManageMembers" type="checkbox" value="yes" />
+                Может управлять доступом
+              </label>
+              <SubmitButton pendingText="Добавляем участника…">Добавить в проект</SubmitButton>
+            </form>
+          ) : null}
+        </div>
+      </details>
       {!archived &&
       item.status !== 'draft' &&
       canAccessProject(access, 'project.members.manage') ? (
-        <section className="panel" aria-labelledby="client-invite-title">
-          <p className="eyebrow">Клиентский доступ</p>
-          <h2 id="client-invite-title">Пригласить представителя клиента</h2>
-          <form
-            className="form-grid"
-            action={`/api/workspaces/${slug}/projects/${projectSlug}/invitations`}
-            method="post"
-          >
-            <label>
-              Email клиента
-              <input name="email" type="email" required />
-            </label>
-            <label>
-              Роль в компании
-              <select name="companyRole" defaultValue="member">
-                <option value="primary">Главный представитель</option>
-                <option value="member">Участник</option>
-              </select>
-            </label>
-            <label>
-              Доступ к проекту
-              <select name="projectRole" defaultValue="client">
-                <option value="client">Участник клиента</option>
-                <option value="observer">Только просмотр</option>
-              </select>
-            </label>
-            <label className="confirm-control">
-              <input name="canApprove" type="checkbox" value="yes" />
-              Может согласовывать границы проекта
-            </label>
-            <button type="submit">Отправить приглашение</button>
-          </form>
-          {invitations.length === 0 ? (
-            <p className="empty">Приглашений по этому проекту пока нет.</p>
-          ) : (
-            <ul className="compact-list">
-              {invitations.map((invite) => (
-                <li key={invite.id}>
-                  <span>
-                    {invite.email}
-                    <small>Действует до {invite.expiresAt.toLocaleString('ru-RU')}</small>
-                  </span>
-                  <span>
-                    {invite.status} · {invite.role === 'observer' ? 'просмотр' : 'клиент'}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      ) : null}
-      <section className="panel danger-zone" aria-labelledby="project-archive-title">
-        <p className="eyebrow">Статус проекта</p>
-        <h2 id="project-archive-title">
-          {archived ? 'Восстановить проект' : 'Архивировать проект'}
-        </h2>
-        {archived ? (
-          isOwner(tenant) ? (
-            <form action={`/api/workspaces/${slug}/projects/${projectSlug}/restore`} method="post">
-              <button className="secondary" type="submit">
-                Восстановить прежний статус
-              </button>
+        <details className="panel disclosure-panel">
+          <summary>
+            <span className="disclosure-title">
+              <small>КЛИЕНТСКИЙ ДОСТУП</small>
+              <span id="client-invite-title">Пригласить представителя клиента</span>
+            </span>
+          </summary>
+          <div className="disclosure-body">
+            <form
+              className="form-grid"
+              action={`/api/workspaces/${slug}/projects/${projectSlug}/invitations`}
+              method="post"
+            >
+              <label>
+                Email клиента
+                <input name="email" type="email" required />
+              </label>
+              <label>
+                Роль в компании
+                <select name="companyRole" defaultValue="member">
+                  <option value="primary">Главный представитель</option>
+                  <option value="member">Участник</option>
+                </select>
+              </label>
+              <label>
+                Доступ к проекту
+                <select name="projectRole" defaultValue="client">
+                  <option value="client">Участник клиента</option>
+                  <option value="observer">Только просмотр</option>
+                </select>
+              </label>
+              <label className="confirm-control">
+                <input name="canApprove" type="checkbox" value="yes" />
+                Может согласовывать границы проекта
+              </label>
+              <SubmitButton pendingText="Готовим приглашение…">Отправить приглашение</SubmitButton>
             </form>
-          ) : (
-            <p className="empty">Только владелец может восстановить проект.</p>
-          )
-        ) : canAccessProject(access, 'project.archive') ? (
-          <form action={`/api/workspaces/${slug}/projects/${projectSlug}/archive`} method="post">
-            <label className="confirm-control">
-              <input name="confirm" type="checkbox" value="yes" required />
-              Подтверждаю перевод в read-only архив
-            </label>
-            <button className="danger" type="submit">
-              Архивировать проект
-            </button>
-          </form>
-        ) : null}
-      </section>
+            {invitations.length === 0 ? (
+              <p className="empty">Приглашений по этому проекту пока нет.</p>
+            ) : (
+              <ul className="compact-list">
+                {invitations.map((invite) => (
+                  <li key={invite.id}>
+                    <span>
+                      {invite.email}
+                      <small>Действует до {invite.expiresAt.toLocaleString('ru-RU')}</small>
+                    </span>
+                    <span>
+                      {invite.status} · {invite.role === 'observer' ? 'просмотр' : 'клиент'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </details>
+      ) : null}
+      <details className="panel danger-zone disclosure-panel">
+        <summary>
+          <span className="disclosure-title">
+            <small>СТАТУС ПРОЕКТА</small>
+            <span id="project-archive-title">
+              {archived ? 'Восстановить проект' : 'Архивировать проект'}
+            </span>
+          </span>
+        </summary>
+        <div className="disclosure-body">
+          {archived ? (
+            isOwner(tenant) ? (
+              <form
+                action={`/api/workspaces/${slug}/projects/${projectSlug}/restore`}
+                method="post"
+              >
+                <SubmitButton className="secondary" pendingText="Восстанавливаем…">
+                  Восстановить прежний статус
+                </SubmitButton>
+              </form>
+            ) : (
+              <p className="empty">Только владелец может восстановить проект.</p>
+            )
+          ) : canAccessProject(access, 'project.archive') ? (
+            <form action={`/api/workspaces/${slug}/projects/${projectSlug}/archive`} method="post">
+              <label className="confirm-control">
+                <input name="confirm" type="checkbox" value="yes" required />
+                Подтверждаю перевод в read-only архив
+              </label>
+              <SubmitButton className="danger" pendingText="Архивируем…">
+                Архивировать проект
+              </SubmitButton>
+            </form>
+          ) : null}
+        </div>
+      </details>
     </main>
   );
 }

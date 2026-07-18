@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { can } from '@garun/core/identity';
 import { listClientCompanies } from '@garun/core/projects';
 
+import { SubmitButton } from '@/app/_components/submit-button';
 import { requireTenantPage } from '@/lib/page-tenant';
 import { database } from '@/lib/server';
 
@@ -56,41 +57,47 @@ export default async function ClientsPage({
           </ul>
         )}
       </section>
-      <section className="panel form-section" aria-labelledby="create-client-title">
-        <p className="eyebrow">Новый клиент</p>
-        <h2 id="create-client-title">Создать компанию</h2>
-        <form className="form-grid" action={`/api/workspaces/${slug}/clients`} method="post">
-          <label>
-            Название компании
-            <input name="name" required maxLength={160} />
-          </label>
-          <label>
-            Юридическое название
-            <input name="legalName" maxLength={240} />
-          </label>
-          <label>
-            Email
-            <input name="email" type="email" maxLength={320} />
-          </label>
-          <label>
-            Телефон
-            <input name="phone" maxLength={80} />
-          </label>
-          <label>
-            Сайт
-            <input name="website" type="url" placeholder="https://example.ru" maxLength={500} />
-          </label>
-          <label>
-            Мессенджер
-            <input name="messenger" maxLength={160} />
-          </label>
-          <label className="full-field">
-            Внутренние заметки
-            <textarea name="internalNotes" rows={5} maxLength={10_000} />
-          </label>
-          <button type="submit">Создать клиента</button>
-        </form>
-      </section>
+      <details className="panel disclosure-panel form-section" open={companies.length === 0}>
+        <summary>
+          <span className="disclosure-title">
+            <small>НОВЫЙ КЛИЕНТ</small>
+            <span id="create-client-title">Создать компанию</span>
+          </span>
+        </summary>
+        <div className="disclosure-body">
+          <form className="form-grid" action={`/api/workspaces/${slug}/clients`} method="post">
+            <label>
+              Название компании
+              <input name="name" required maxLength={160} />
+            </label>
+            <label>
+              Юридическое название
+              <input name="legalName" maxLength={240} />
+            </label>
+            <label>
+              Email
+              <input name="email" type="email" maxLength={320} />
+            </label>
+            <label>
+              Телефон
+              <input name="phone" maxLength={80} />
+            </label>
+            <label>
+              Сайт
+              <input name="website" type="url" placeholder="https://example.ru" maxLength={500} />
+            </label>
+            <label>
+              Мессенджер
+              <input name="messenger" maxLength={160} />
+            </label>
+            <label className="full-field">
+              Внутренние заметки
+              <textarea name="internalNotes" rows={5} maxLength={10_000} />
+            </label>
+            <SubmitButton pendingText="Создаём клиента…">Создать клиента</SubmitButton>
+          </form>
+        </div>
+      </details>
     </main>
   );
 }

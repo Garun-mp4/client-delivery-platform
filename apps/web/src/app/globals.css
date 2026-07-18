@@ -770,15 +770,25 @@ h2 {
   font-variant-numeric: tabular-nums;
 }
 .route-track {
+  display: block;
+  width: 100%;
   height: 5px;
   margin-top: 1.25rem;
+  appearance: none;
   overflow: hidden;
   border-radius: 4px;
+  border: 0;
   background: var(--surface-inset);
 }
-.route-track span {
-  display: block;
-  height: 100%;
+.route-track::-webkit-progress-bar {
+  border-radius: inherit;
+  background: var(--surface-inset);
+}
+.route-track::-webkit-progress-value {
+  border-radius: inherit;
+  background: var(--marker-green);
+}
+.route-track::-moz-progress-bar {
   border-radius: inherit;
   background: var(--marker-green);
 }
@@ -892,14 +902,60 @@ summary {
   cursor: pointer;
   font-weight: 650;
 }
-details[open] {
+.row-actions details[open] {
   max-width: 280px;
   border: 1px solid var(--line);
   padding: 0.75rem;
   background: white;
 }
-details form {
+.row-actions details form {
   margin-top: 0.5rem;
+}
+.disclosure-panel {
+  overflow: hidden;
+}
+.disclosure-panel > summary {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  list-style: none;
+}
+.disclosure-panel > summary::-webkit-details-marker {
+  display: none;
+}
+.disclosure-panel > summary::after {
+  content: 'Открыть';
+  color: var(--marker-green);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+.disclosure-panel[open] > summary::after {
+  content: 'Свернуть';
+}
+.disclosure-title {
+  display: grid;
+  gap: 0.25rem;
+}
+.disclosure-title small {
+  color: var(--ink-tertiary);
+  font-size: 0.74rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.disclosure-title strong {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.4rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.disclosure-body {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 0.25rem;
 }
 .inline-form {
   display: grid;

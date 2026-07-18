@@ -1,7 +1,7 @@
 import Link from 'next/link';
 export default function InvalidInvitePage() {
   return (
-    <main className="auth-shell">
+    <main className="auth-shell" id="main-content">
       <section className="auth-card">
         <h1>Ссылка недействительна</h1>
         <p className="lede">Она могла быть использована или отозвана.</p>

@@ -26,16 +26,12 @@ export function ProjectRoute({
         </div>
         <span className="route-progress">{progress}%</span>
       </div>
-      <div
+      <progress
         aria-label={`Выполнено ${progress}%`}
-        aria-valuemax={100}
-        aria-valuemin={0}
-        aria-valuenow={progress}
         className="route-track"
-        role="progressbar"
-      >
-        <span style={{ inlineSize: `${Math.min(100, Math.max(0, progress))}%` }} />
-      </div>
+        max={100}
+        value={Math.min(100, Math.max(0, progress))}
+      />
       <dl className="route-steps">
         <div>
           <dt>Состояние</dt>

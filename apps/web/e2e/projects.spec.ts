@@ -45,10 +45,11 @@ test('owner publishes one project and grants then revokes explicit client access
   await page.goto('/login');
   await page.getByLabel('Email', { exact: true }).fill(ownerEmail);
   await page.getByLabel('Пароль').fill(ownerPassword);
-  await page.getByRole('button', { name: 'Войти с паролем' }).click();
+  await page.getByRole('button', { name: 'Войти' }).click();
   await expect(page).toHaveURL(/\/workspace\/e2e-studio/);
 
   await page.goto('/workspace/e2e-studio/clients');
+  await page.getByText('Создать компанию', { exact: true }).click();
   await page.getByLabel('Название компании').fill(companyName);
   await page.getByLabel('Email', { exact: true }).fill(clientEmail);
   await page.getByLabel('Внутренние заметки').fill(internalNote);
@@ -56,6 +57,7 @@ test('owner publishes one project and grants then revokes explicit client access
   await expect(page.getByRole('heading', { name: companyName })).toBeVisible();
 
   await page.goto('/workspace/e2e-studio/projects');
+  await page.getByText('Создать черновик', { exact: true }).click();
   await page.getByLabel('Название проекта').fill(projectName);
   await page.getByLabel('Адрес проекта').fill(projectSlug);
   await page.getByLabel('Компания клиента').selectOption({ label: companyName });
@@ -73,6 +75,7 @@ test('owner publishes one project and grants then revokes explicit client access
   await page.getByLabel('Показывать приглашённым клиентам').check();
   await page.getByRole('button', { name: 'Опубликовать проект' }).click();
   await expect(page.getByText('Операция выполнена.')).toBeVisible();
+  await page.getByText('Пригласить представителя клиента', { exact: true }).click();
   await page.getByLabel('Email клиента').fill(clientEmail);
   await page.getByLabel('Может согласовывать границы проекта').check();
   await page.getByRole('button', { name: 'Отправить приглашение' }).click();
@@ -89,7 +92,7 @@ test('owner publishes one project and grants then revokes explicit client access
   await expect(clientPage.getByRole('heading', { name: projectName })).toBeVisible();
   await expect(clientPage.getByText(internalNote)).toHaveCount(0);
 
-  await page.getByRole('link', { name: 'План, этапы и действия' }).click();
+  await page.getByRole('link', { name: 'План', exact: true }).click();
   await page.getByLabel('Краткое описание').fill('Разработка публичного сайта компании');
   await page.getByLabel(/Цели —/).fill('Запустить новый канал продаж');
   await page.getByLabel(/Страницы —/).fill('Главная\nКаталог');
@@ -142,6 +145,7 @@ test('owner publishes one project and grants then revokes explicit client access
   expect(accessibility.violations).toEqual([]);
 
   await page.goto(`/workspace/e2e-studio/projects/${projectSlug}`);
+  await page.getByText('Участники проекта', { exact: true }).click();
   await page.getByLabel('Подтверждаю отзыв доступа').check();
   await page.getByRole('button', { name: 'Удалить из проекта' }).click();
   await expect(page.getByText('Операция выполнена.')).toBeVisible();

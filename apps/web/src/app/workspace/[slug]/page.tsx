@@ -7,6 +7,7 @@ import { getProjectWorkflow, listWorkspaceWorkflowOverview } from '@garun/core/w
 import { projectStatusLabels } from './projects/project-copy';
 import { requireTenantPage } from '@/lib/page-tenant';
 import { database } from '@/lib/server';
+import { formatProjectWaitingTitle } from '@/lib/ux-copy';
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' }).format(
@@ -49,7 +50,7 @@ export default async function WorkspaceOverviewPage({
             }
           : waiting.length > 0
             ? {
-                title: `${waiting.length} ${waiting.length === 1 ? 'проект ожидает' : 'проекта ожидают'} клиента`,
+                title: formatProjectWaitingTitle(waiting.length),
                 body: 'Откройте проект, чтобы проверить блокирующее действие и при необходимости напомнить клиенту.',
                 href: `/workspace/${slug}/projects/${waiting[0]!.slug}/workflow`,
                 label: 'Проверить ожидание',

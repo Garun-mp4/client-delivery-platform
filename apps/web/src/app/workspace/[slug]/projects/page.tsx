@@ -9,6 +9,7 @@ import {
 import { listWorkspaceWorkflowOverview } from '@garun/core/workflow';
 
 import { projectStatusLabels, projectTypeLabels } from './project-copy';
+import { SubmitButton } from '@/app/_components/submit-button';
 import { requireTenantPage } from '@/lib/page-tenant';
 import { database } from '@/lib/server';
 
@@ -90,79 +91,85 @@ export default async function ProjectsPage({
         )}
       </section>
       {owner ? (
-        <section className="panel form-section" aria-labelledby="create-project-title">
-          <p className="eyebrow">Новый проект</p>
-          <h2 id="create-project-title">Создать черновик</h2>
-          {companies.length === 0 ? (
-            <p className="empty">
-              Сначала <Link href={`/workspace/${slug}/clients`}>создайте карточку клиента</Link>.
-            </p>
-          ) : (
-            <form className="form-grid" action={`/api/workspaces/${slug}/projects`} method="post">
-              <label>
-                Название проекта
-                <input name="name" required maxLength={180} />
-              </label>
-              <label>
-                Адрес проекта
-                <input
-                  name="slug"
-                  required
-                  pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-                  placeholder="new-website"
-                  maxLength={80}
-                />
-                <small>Латинские буквы, цифры и дефисы.</small>
-              </label>
-              <label>
-                Компания клиента
-                <select name="clientCompanyId" required defaultValue="">
-                  <option value="" disabled>
-                    Выберите компанию
-                  </option>
-                  {companies.map((company) => (
-                    <option key={company.id} value={company.id}>
-                      {company.name}
+        <details className="panel disclosure-panel form-section" open={projects.length === 0}>
+          <summary>
+            <span className="disclosure-title">
+              <small>НОВЫЙ ПРОЕКТ</small>
+              <span id="create-project-title">Создать черновик</span>
+            </span>
+          </summary>
+          <div className="disclosure-body">
+            {companies.length === 0 ? (
+              <p className="empty">
+                Сначала <Link href={`/workspace/${slug}/clients`}>создайте карточку клиента</Link>.
+              </p>
+            ) : (
+              <form className="form-grid" action={`/api/workspaces/${slug}/projects`} method="post">
+                <label>
+                  Название проекта
+                  <input name="name" required maxLength={180} />
+                </label>
+                <label>
+                  Адрес проекта
+                  <input
+                    name="slug"
+                    required
+                    pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                    placeholder="new-website"
+                    maxLength={80}
+                  />
+                  <small>Латинские буквы, цифры и дефисы.</small>
+                </label>
+                <label>
+                  Компания клиента
+                  <select name="clientCompanyId" required defaultValue="">
+                    <option value="" disabled>
+                      Выберите компанию
                     </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Тип проекта
-                <select name="projectType" required defaultValue="website">
-                  {Object.entries(projectTypeLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Ответственный
-                <select name="ownerUserId" required defaultValue={tenant.userId}>
-                  {members.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Плановое начало
-                <input name="plannedStartDate" type="date" required />
-              </label>
-              <label>
-                Плановое завершение
-                <input name="plannedEndDate" type="date" required />
-              </label>
-              <label className="full-field">
-                Описание
-                <textarea name="description" rows={5} maxLength={5_000} />
-              </label>
-              <button type="submit">Создать черновик</button>
-            </form>
-          )}
-        </section>
+                    {companies.map((company) => (
+                      <option key={company.id} value={company.id}>
+                        {company.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Тип проекта
+                  <select name="projectType" required defaultValue="website">
+                    {Object.entries(projectTypeLabels).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Ответственный
+                  <select name="ownerUserId" required defaultValue={tenant.userId}>
+                    {members.map((member) => (
+                      <option key={member.id} value={member.id}>
+                        {member.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Плановое начало
+                  <input name="plannedStartDate" type="date" required />
+                </label>
+                <label>
+                  Плановое завершение
+                  <input name="plannedEndDate" type="date" required />
+                </label>
+                <label className="full-field">
+                  Описание
+                  <textarea name="description" rows={5} maxLength={5_000} />
+                </label>
+                <SubmitButton pendingText="Создаём проект…">Создать черновик</SubmitButton>
+              </form>
+            )}
+          </div>
+        </details>
       ) : null}
     </main>
   );

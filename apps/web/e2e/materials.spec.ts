@@ -47,13 +47,15 @@ test('client uploads a quarantined material that becomes available and is accept
   await page.goto('/login');
   await page.getByLabel('Email', { exact: true }).fill(ownerEmail);
   await page.getByLabel('Пароль').fill(ownerPassword);
-  await page.getByRole('button', { name: 'Войти с паролем' }).click();
+  await page.getByRole('button', { name: 'Войти' }).click();
   await expect(page).toHaveURL(/\/workspace\/e2e-studio/);
 
   await page.goto('/workspace/e2e-studio/clients');
+  await page.getByText('Создать компанию', { exact: true }).click();
   await page.getByLabel('Название компании').fill(companyName);
   await page.getByRole('button', { name: 'Создать клиента' }).click();
   await page.goto('/workspace/e2e-studio/projects');
+  await page.getByText('Создать черновик', { exact: true }).click();
   await page.getByLabel('Название проекта').fill(projectName);
   await page.getByLabel('Адрес проекта').fill(projectSlug);
   await page.getByLabel('Компания клиента').selectOption({ label: companyName });
@@ -62,6 +64,7 @@ test('client uploads a quarantined material that becomes available and is accept
   await page.getByRole('button', { name: 'Создать черновик' }).click();
   await page.getByLabel('Показывать приглашённым клиентам').check();
   await page.getByRole('button', { name: 'Опубликовать проект' }).click();
+  await page.getByText('Пригласить представителя клиента', { exact: true }).click();
   await page.getByLabel('Email клиента').fill(clientEmail);
   await page.getByRole('button', { name: 'Отправить приглашение' }).click();
 
