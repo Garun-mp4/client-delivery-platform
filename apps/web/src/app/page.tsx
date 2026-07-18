@@ -1,42 +1,63 @@
 import { connection } from 'next/server';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
 import { parseProductConfig } from '@garun/config';
-import { Card } from '@garun/ui/card';
-import { StatusBadge } from '@garun/ui/status-badge';
+
+import { currentSession } from '@/lib/server';
 
 export default async function HomePage() {
   await connection();
   const product = parseProductConfig();
+  if (await currentSession()) redirect('/workspace');
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-4xl items-center px-5 py-12 sm:px-8">
-      <Card aria-labelledby="foundation-title" className="w-full">
-        <StatusBadge>Инженерная основа запущена</StatusBadge>
-        <h1
-          id="foundation-title"
-          className="mt-5 text-3xl font-semibold tracking-tight sm:text-5xl"
-        >
-          {product.APP_NAME}
-        </h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
-          Безопасное пространство для команды: доступ только по приглашению, управляемые сессии и
-          изоляция данных.
-        </p>
-        <dl className="mt-8 grid gap-4 border-t border-slate-200 pt-6 sm:grid-cols-2">
-          <div>
-            <dt className="text-sm font-medium text-slate-500">Окружение</dt>
-            <dd className="mt-1 font-medium">{product.APP_ENV}</dd>
-          </div>
-          <div>
-            <dt className="text-sm font-medium text-slate-500">Техническое состояние</dt>
-            <dd className="mt-1 font-medium">Identity и workspace готовы к проверке</dd>
-          </div>
-        </dl>
-        <Link className="text-link" href="/login">
-          Войти в workspace
-        </Link>
-      </Card>
+    <main className="entry-shell" id="main-content">
+      <div className="entry-wordmark">{product.APP_NAME}</div>
+      <section className="entry-main" aria-labelledby="entry-title">
+        <div className="entry-copy">
+          <p className="eyebrow">Работа с клиентом без потерянного контекста</p>
+          <h1 id="entry-title">Откройте проект и сразу увидьте следующий шаг</h1>
+          <p className="lede">
+            Материалы, анкеты, этапы и решения собраны в одном понятном маршруте — отдельно для
+            разработчика и клиента.
+          </p>
+          <Link className="button-primary entry-action" href="/login">
+            Войти в рабочее пространство
+          </Link>
+          <p className="entry-note">Доступ предоставляется только по приглашению.</p>
+        </div>
+        <div className="entry-route" aria-label="Пример маршрута проекта">
+          <p className="section-label">Маршрут проекта</p>
+          <ol>
+            <li className="is-complete">
+              <span>01</span>
+              <div>
+                <strong>Бриф заполнен</strong>
+                <small>Информация сохранена</small>
+              </div>
+            </li>
+            <li className="is-current">
+              <span>02</span>
+              <div>
+                <strong>Нужен логотип</strong>
+                <small>Действие клиента</small>
+              </div>
+            </li>
+            <li>
+              <span>03</span>
+              <div>
+                <strong>Первый макет</strong>
+                <small>Следующий результат</small>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+      <footer className="entry-footer">
+        <span>Garun Workspace</span>
+        <span>Приватное пространство клиентского проекта</span>
+      </footer>
     </main>
   );
 }

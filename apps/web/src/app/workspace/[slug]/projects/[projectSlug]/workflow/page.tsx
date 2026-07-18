@@ -10,7 +10,7 @@ import {
   listWorkflowAssignees,
 } from '@garun/core/workflow';
 
-import { WorkspaceNav } from '../../../_components/workspace-nav';
+import { ProjectNav } from '../_components/project-nav';
 import { requireTenantPage } from '@/lib/page-tenant';
 import { database } from '@/lib/server';
 
@@ -73,7 +73,7 @@ export default async function WorkflowPage({
 
   return (
     <main className="workspace-shell">
-      <header className="workspace-header">
+      <header className="page-header">
         <div>
           <p className="eyebrow">План и выполнение</p>
           <h1>{workflow.project.name}</h1>
@@ -85,7 +85,7 @@ export default async function WorkflowPage({
           К карточке проекта
         </Link>
       </header>
-      <WorkspaceNav slug={slug} internal={internal} />
+      <ProjectNav projectSlug={projectSlug} workspaceSlug={slug} />
       {feedback.success ? (
         <p className="notice success" role="status">
           Изменения сохранены.

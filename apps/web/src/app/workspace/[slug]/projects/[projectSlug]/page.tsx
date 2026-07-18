@@ -12,8 +12,10 @@ import {
   listProjectMembers,
   resolveProjectAccess,
 } from '@garun/core/projects';
+import { getProjectWorkflow } from '@garun/core/workflow';
 
-import { WorkspaceNav } from '../../_components/workspace-nav';
+import { ProjectNav } from './_components/project-nav';
+import { ProjectRoute } from './_components/project-route';
 import { projectStatusLabels, projectTypeLabels } from '../project-copy';
 import { requireTenantPage } from '@/lib/page-tenant';
 import { database } from '@/lib/server';
@@ -22,11 +24,13 @@ function ClientProjectView({
   slug,
   workspaceSlug,
   project: item,
+  workflow,
   preview,
 }: {
   slug: string;
   workspaceSlug: string;
   project: NonNullable<Awaited<ReturnType<typeof getClientProject>>>;
+  workflow: Awaited<ReturnType<typeof getProjectWorkflow>>;
   preview: boolean;
 }) {
   return (
@@ -38,45 +42,40 @@ function ClientProjectView({
           <Link href={`/workspace/${workspaceSlug}/projects/${slug}`}>Вернуться к управлению</Link>
         </div>
       ) : null}
-      <header className="workspace-header">
+      <header className="page-header project-page-header">
         <div>
           <p className="eyebrow">Проект · {item.company.name}</p>
           <h1>{item.name}</h1>
-          <p className="lede">{item.description ?? 'Описание проекта пока не добавлено.'}</p>
+          <p className="lede">Состояние, ближайшее действие и материалы проекта — в одном месте.</p>
         </div>
         <span className="status-pill">{projectStatusLabels[item.status]}</span>
       </header>
-      <WorkspaceNav slug={workspaceSlug} internal={false} />
-      <p>
-        <Link
-          className="provider-link"
-          href={`/workspace/${workspaceSlug}/projects/${slug}/workflow`}
-        >
-          Открыть план и действия
-        </Link>{' '}
-        <Link
-          className="provider-link"
-          href={`/workspace/${workspaceSlug}/projects/${slug}/questionnaires`}
-        >
-          Открыть анкеты
-        </Link>
-        <Link
-          className="provider-link"
-          href={`/workspace/${workspaceSlug}/projects/${slug}/materials`}
-        >
-          Передать материалы
-        </Link>
-      </p>
+      <ProjectNav projectSlug={slug} workspaceSlug={workspaceSlug} />
       {item.status === 'archived' ? (
         <p className="notice" role="status">
           Проект находится в архиве и доступен только для чтения.
         </p>
       ) : null}
+      <ProjectRoute
+        action={workflow?.nextAction?.title ?? 'От вас пока ничего не требуется'}
+        actionHref={
+          workflow?.nextAction ? `/workspace/${workspaceSlug}/projects/${slug}/workflow` : undefined
+        }
+        actionLabel={workflow?.nextAction ? 'Перейти к действию' : undefined}
+        progress={workflow?.progressPercent ?? 0}
+        responsibility={workflow?.nextAction ? 'Вы' : 'Команда проекта'}
+        result={
+          workflow?.nextAction
+            ? 'После выполнения разработчик увидит результат и продолжит работу.'
+            : 'Новое действие появится здесь, когда понадобится ваше участие.'
+        }
+        status={projectStatusLabels[item.status]}
+      />
       <section className="client-summary" aria-labelledby="project-summary-title">
         <div>
-          <p className="eyebrow">Сейчас</p>
-          <h2 id="project-summary-title">От вас пока ничего не требуется</h2>
-          <p>Проект опубликован. Когда появится следующее действие, оно будет показано здесь.</p>
+          <p className="eyebrow">О проекте</p>
+          <h2 id="project-summary-title">Что мы создаём</h2>
+          <p>{item.description ?? 'Описание проекта пока не добавлено.'}</p>
         </div>
         <dl>
           <div>
@@ -113,23 +112,28 @@ export default async function ProjectPage({
   const preview = feedback.preview === 'client' && isOwner(tenant);
   const internal = canAccessProject(access, 'project.view.internal') && !preview;
   if (!internal) {
-    const clientProject = await getClientProject(database.db, tenant, projectSlug, preview);
+    const [clientProject, workflow] = await Promise.all([
+      getClientProject(database.db, tenant, projectSlug, preview),
+      getProjectWorkflow(database.db, tenant, projectSlug),
+    ]);
     if (!clientProject) notFound();
     return (
       <ClientProjectView
         slug={projectSlug}
         workspaceSlug={slug}
         project={clientProject}
+        workflow={workflow}
         preview={preview}
       />
     );
   }
-  const [item, companies, workspaceMembers, members, invitations] = await Promise.all([
+  const [item, companies, workspaceMembers, members, invitations, workflow] = await Promise.all([
     getInternalProject(database.db, tenant, projectSlug),
     listActiveClientCompanies(database.db, tenant),
     listInternalWorkspaceMembers(database.db, tenant),
     listProjectMembers(database.db, tenant, projectSlug),
     listProjectInvitations(database.db, tenant, projectSlug),
+    getProjectWorkflow(database.db, tenant, projectSlug),
   ]);
   if (!item) notFound();
   const archived = item.status === 'archived';
@@ -137,7 +141,7 @@ export default async function ProjectPage({
   const candidates = workspaceMembers.filter((member) => !memberUserIds.has(member.id));
   return (
     <main className="workspace-shell">
-      <header className="workspace-header">
+      <header className="page-header project-page-header">
         <div>
           <p className="eyebrow">Проект · {item.companyName}</p>
           <h1>{item.name}</h1>
@@ -149,7 +153,7 @@ export default async function ProjectPage({
           Ко всем проектам
         </Link>
       </header>
-      <WorkspaceNav slug={slug} internal={isOwner(tenant)} />
+      <ProjectNav projectSlug={projectSlug} workspaceSlug={slug} />
       {feedback.success ? (
         <p className="notice success" role="status">
           Операция выполнена.
@@ -160,27 +164,9 @@ export default async function ProjectPage({
           Операцию выполнить не удалось. Проверьте данные или состояние проекта.
         </p>
       ) : null}
-      <div className="project-toolbar">
+      <div className="project-toolbar project-toolbar-secondary">
         <Link
-          className="provider-link"
-          href={`/workspace/${slug}/projects/${projectSlug}/workflow`}
-        >
-          План, этапы и действия
-        </Link>
-        <Link
-          className="provider-link"
-          href={`/workspace/${slug}/projects/${projectSlug}/questionnaires`}
-        >
-          Анкеты
-        </Link>
-        <Link
-          className="provider-link"
-          href={`/workspace/${slug}/projects/${projectSlug}/materials`}
-        >
-          Материалы
-        </Link>
-        <Link
-          className="provider-link"
+          className="button-secondary"
           href={`/workspace/${slug}/projects/${projectSlug}?preview=client`}
         >
           Посмотреть глазами клиента
@@ -195,6 +181,23 @@ export default async function ProjectPage({
           </form>
         ) : null}
       </div>
+      <ProjectRoute
+        action={
+          workflow?.blockedByClient?.title ??
+          workflow?.nextAction?.title ??
+          'Определите ближайшее действие проекта'
+        }
+        actionHref={`/workspace/${slug}/projects/${projectSlug}/workflow`}
+        actionLabel="Открыть план"
+        progress={workflow?.progressPercent ?? 0}
+        responsibility={workflow?.blockedByClient ? 'Клиент' : 'Команда проекта'}
+        result={
+          workflow?.blockedByClient
+            ? 'После ответа клиента блокировка снимется и работа сможет продолжиться.'
+            : 'Завершённые этапы автоматически обновят общий прогресс проекта.'
+        }
+        status={projectStatusLabels[item.status]}
+      />
       <section className="panel" aria-labelledby="project-data-title">
         <p className="eyebrow">Параметры</p>
         <h2 id="project-data-title">Карточка проекта</h2>

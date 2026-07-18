@@ -4,7 +4,6 @@ import { notFound } from 'next/navigation';
 import { can } from '@garun/core/identity';
 import { getInternalClientCompany, listProjects } from '@garun/core/projects';
 
-import { WorkspaceNav } from '../../_components/workspace-nav';
 import { requireTenantPage } from '@/lib/page-tenant';
 import { database } from '@/lib/server';
 
@@ -27,7 +26,7 @@ export default async function ClientPage({
   const archived = company.status === 'archived';
   return (
     <main className="workspace-shell">
-      <header className="workspace-header">
+      <header className="page-header">
         <div>
           <p className="eyebrow">Карточка клиента</p>
           <h1>{company.name}</h1>
@@ -37,7 +36,6 @@ export default async function ClientPage({
           Ко всем клиентам
         </Link>
       </header>
-      <WorkspaceNav slug={slug} internal />
       {feedback.success ? (
         <p className="notice success" role="status">
           Изменение сохранено.

@@ -8,7 +8,6 @@ import {
 } from '@garun/core/projects';
 import { listWorkspaceWorkflowOverview } from '@garun/core/workflow';
 
-import { WorkspaceNav } from '../_components/workspace-nav';
 import { projectStatusLabels, projectTypeLabels } from './project-copy';
 import { requireTenantPage } from '@/lib/page-tenant';
 import { database } from '@/lib/server';
@@ -33,7 +32,7 @@ export default async function ProjectsPage({
   const internal = owner || projects.some((item) => item.side === 'internal');
   return (
     <main className="workspace-shell">
-      <header className="workspace-header">
+      <header className="page-header">
         <div>
           <p className="eyebrow">Проекты</p>
           <h1>{internal ? 'Работа с клиентами' : 'Ваши проекты'}</h1>
@@ -44,13 +43,12 @@ export default async function ProjectsPage({
           </p>
         </div>
       </header>
-      <WorkspaceNav slug={slug} internal={owner} />
       {feedback.error ? (
         <p className="notice error" role="alert">
           Проект создать не удалось. Проверьте обязательные поля, даты и уникальность адреса.
         </p>
       ) : null}
-      <section className="panel" aria-labelledby="projects-list-title">
+      <section className="overview-section" aria-labelledby="projects-list-title">
         <div className="section-heading">
           <div>
             <p className="eyebrow">Доступные проекты</p>
@@ -92,7 +90,7 @@ export default async function ProjectsPage({
         )}
       </section>
       {owner ? (
-        <section className="panel" aria-labelledby="create-project-title">
+        <section className="panel form-section" aria-labelledby="create-project-title">
           <p className="eyebrow">Новый проект</p>
           <h2 id="create-project-title">Создать черновик</h2>
           {companies.length === 0 ? (

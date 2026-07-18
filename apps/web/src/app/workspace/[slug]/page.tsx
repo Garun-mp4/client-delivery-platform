@@ -1,274 +1,227 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
-import { notFound, redirect } from 'next/navigation';
-import { headers } from 'next/headers';
+import Link from 'next/link';
 
-import { can, resolveTenantContext } from '@garun/core/identity';
-import {
-  auditEvent,
-  invitation,
-  projectMembership,
-  session,
-  user,
-  workspace,
-  workspaceMembership,
-} from '@garun/db/schema';
+import { isOwner } from '@garun/core/identity';
+import { listActiveClientCompanies, listProjects } from '@garun/core/projects';
+import { getProjectWorkflow, listWorkspaceWorkflowOverview } from '@garun/core/workflow';
 
-import { auth, database } from '@/lib/server';
-import { WorkspaceNav } from './_components/workspace-nav';
+import { projectStatusLabels } from './projects/project-copy';
+import { requireTenantPage } from '@/lib/page-tenant';
+import { database } from '@/lib/server';
 
-export default async function WorkspacePage({
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' }).format(
+    new Date(`${value}T00:00:00Z`),
+  );
+}
+
+export default async function WorkspaceOverviewPage({
   params,
-  searchParams,
 }: {
-  params: Promise<{ slug: string }>;
-  searchParams: Promise<{ success?: string; error?: string }>;
+  readonly params: Promise<{ slug: string }>;
 }) {
-  const [{ slug }, feedback, requestHeaders] = await Promise.all([params, searchParams, headers()]);
-  const identity = await auth.api.getSession({ headers: requestHeaders });
-  if (!identity) redirect(`/login?callback=/workspace/${slug}`);
-  const tenant = await resolveTenantContext(database.db, identity.user.id, slug);
-  if (!tenant || !can(tenant, 'workspace.view')) {
-    await database.db.insert(auditEvent).values({
-      actorUserId: identity.user.id,
-      action: 'access.denied',
-      entityType: 'workspace',
-      requestId: requestHeaders.get('x-request-id') ?? undefined,
-      metadata: { reasonCode: 'TENANT_CONTEXT_NOT_RESOLVED' },
-    });
-    notFound();
-  }
-  const [space] = await database.db
-    .select({ name: workspace.name, locale: workspace.locale, timezone: workspace.timezone })
-    .from(workspace)
-    .where(eq(workspace.id, tenant.workspaceId))
-    .limit(1);
-  if (!space) notFound();
-  if (tenant.role !== 'owner') {
-    const [assignedProject] = await database.db
-      .select({ id: projectMembership.id })
-      .from(projectMembership)
-      .where(
-        and(
-          eq(projectMembership.workspaceId, tenant.workspaceId),
-          eq(projectMembership.userId, tenant.userId),
-          isNull(projectMembership.removedAt),
-        ),
-      )
-      .limit(1);
-    if (assignedProject) redirect(`/workspace/${slug}/projects`);
-  }
-  const members = await database.db
-    .select({
-      id: workspaceMembership.id,
-      userId: user.id,
-      name: user.name,
-      email: user.email,
-      role: workspaceMembership.role,
-      status: workspaceMembership.status,
-    })
-    .from(workspaceMembership)
-    .innerJoin(user, eq(user.id, workspaceMembership.userId))
-    .where(eq(workspaceMembership.workspaceId, tenant.workspaceId))
-    .orderBy(user.name);
-  const invitations = can(tenant, 'members.invite')
-    ? await database.db
-        .select({
-          id: invitation.id,
-          email: invitation.email,
-          status: invitation.status,
-          expiresAt: invitation.expiresAt,
-        })
-        .from(invitation)
-        .where(eq(invitation.workspaceId, tenant.workspaceId))
-        .orderBy(desc(invitation.createdAt))
-        .limit(20)
-    : [];
-  const sessions = await database.db
-    .select({
-      id: session.id,
-      createdAt: session.createdAt,
-      expiresAt: session.expiresAt,
-      userAgent: session.userAgent,
-    })
-    .from(session)
-    .where(eq(session.userId, identity.user.id))
-    .orderBy(desc(session.createdAt));
-  return (
-    <main className="workspace-shell">
-      <header className="workspace-header">
-        <div>
-          <p className="eyebrow">Рабочее пространство</p>
-          <h1>{space.name}</h1>
-          <p className="muted">
-            {identity.user.name} · {identity.user.email}
-          </p>
-        </div>
-        <form action="/api/logout" method="post">
-          <button className="secondary" type="submit">
-            Выйти
-          </button>
-        </form>
-      </header>
-      <WorkspaceNav slug={slug} internal={tenant.role === 'owner'} />
-      {feedback.success ? (
-        <p className="notice success" role="status">
-          Изменение сохранено.
-        </p>
-      ) : null}
-      {feedback.error ? (
-        <p className="notice error" role="alert">
-          Операцию выполнить не удалось. Проверьте данные и повторите.
-        </p>
-      ) : null}
-      <div className="access-line" aria-label="Текущая роль">
-        <span>{tenant.role === 'owner' ? 'Владелец' : 'Участник'}</span>
-        <span>
-          {space.locale} · {space.timezone}
-        </span>
-      </div>
-      <section className="panel" aria-labelledby="members-title">
-        <div className="section-heading">
+  const { slug } = await params;
+  const { identity, tenant } = await requireTenantPage(slug);
+  const owner = isOwner(tenant);
+  const projects = await listProjects(database.db, tenant);
+
+  if (owner) {
+    const [companies, overview] = await Promise.all([
+      listActiveClientCompanies(database.db, tenant),
+      listWorkspaceWorkflowOverview(database.db, tenant),
+    ]);
+    const routeByProject = new Map(overview.map((item) => [item.projectId, item]));
+    const waiting = projects.filter((item) => routeByProject.get(item.id)?.blockingAction);
+    const active = projects.filter((item) => item.status !== 'archived');
+    const firstAction =
+      companies.length === 0
+        ? {
+            title: 'Добавьте первого клиента',
+            body: 'Карточка клиента нужна, чтобы создать проект и сохранить контакты в одном месте.',
+            href: `/workspace/${slug}/clients`,
+            label: 'Добавить клиента',
+          }
+        : projects.length === 0
+          ? {
+              title: 'Создайте первый проект',
+              body: 'Клиент уже добавлен. Теперь задайте сроки и подготовьте проект до публикации.',
+              href: `/workspace/${slug}/projects`,
+              label: 'Создать проект',
+            }
+          : waiting.length > 0
+            ? {
+                title: `${waiting.length} ${waiting.length === 1 ? 'проект ожидает' : 'проекта ожидают'} клиента`,
+                body: 'Откройте проект, чтобы проверить блокирующее действие и при необходимости напомнить клиенту.',
+                href: `/workspace/${slug}/projects/${waiting[0]!.slug}/workflow`,
+                label: 'Проверить ожидание',
+              }
+            : {
+                title: 'Работа движется по плану',
+                body: 'Нет блокирующих клиентских действий. Откройте проекты, чтобы проверить ближайшие этапы.',
+                href: `/workspace/${slug}/projects`,
+                label: 'Открыть проекты',
+              };
+
+    return (
+      <main className="workspace-shell">
+        <header className="page-header overview-header">
           <div>
-            <p className="eyebrow">Доступ</p>
-            <h2 id="members-title">Участники</h2>
+            <p className="eyebrow">Рабочий центр</p>
+            <h1>Добрый день, {identity.user.name.split(' ')[0]}</h1>
+            <p className="lede">Здесь только то, что помогает двигать клиентские проекты дальше.</p>
           </div>
-          <span className="count">{members.length}</span>
-        </div>
-        <ul className="rows">
-          {members.map((member) => (
-            <li key={member.id}>
-              <div>
-                <strong>{member.name}</strong>
-                <span>{member.email}</span>
-              </div>
-              <div className="row-actions">
-                <span className="role">
-                  {member.role === 'owner'
-                    ? 'Владелец'
-                    : member.status === 'active'
-                      ? 'Участник'
-                      : 'Отключён'}
-                </span>
-                {can(tenant, 'members.manage') &&
-                member.role !== 'owner' &&
-                member.status === 'active' ? (
-                  <details>
-                    <summary>Управление</summary>
-                    <p>Участник сразу потеряет доступ, его сессии завершатся.</p>
-                    <form
-                      action={`/api/workspaces/${slug}/members/${member.id}/disable`}
-                      method="post"
-                    >
-                      <label className="confirm-control">
-                        <input name="confirm" type="checkbox" value="yes" required />
-                        Подтверждаю отключение
-                      </label>
-                      <button className="danger" type="submit">
-                        Отключить доступ
-                      </button>
-                    </form>
-                    <form
-                      action={`/api/workspaces/${slug}/members/${member.id}/revoke-sessions`}
-                      method="post"
-                    >
-                      <label className="confirm-control">
-                        <input name="confirm" type="checkbox" value="yes" required />
-                        Подтверждаю завершение сеансов
-                      </label>
-                      <button className="secondary" type="submit">
-                        Завершить сеансы
-                      </button>
-                    </form>
-                  </details>
-                ) : null}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
-      {can(tenant, 'members.invite') ? (
-        <section className="panel" aria-labelledby="invite-title">
-          <p className="eyebrow">Только для владельца</p>
-          <h2 id="invite-title">Пригласить участника</h2>
-          <form
-            className="inline-form"
-            action={`/api/workspaces/${slug}/invitations`}
-            method="post"
-          >
+          <Link className="button-secondary" href={`/workspace/${slug}/projects`}>
+            Все проекты
+          </Link>
+        </header>
+
+        <section className="attention-panel" aria-labelledby="attention-title">
+          <div>
+            <p className="section-label">Следующий шаг</p>
+            <h2 id="attention-title">{firstAction.title}</h2>
+            <p>{firstAction.body}</p>
+          </div>
+          <Link className="button-primary" href={firstAction.href}>
+            {firstAction.label}
+          </Link>
+        </section>
+
+        <dl className="overview-facts" aria-label="Состояние рабочего пространства">
+          <div>
+            <dt>Активные проекты</dt>
+            <dd>{active.length}</dd>
+          </div>
+          <div>
+            <dt>Ожидают клиента</dt>
+            <dd>{waiting.length}</dd>
+          </div>
+          <div>
+            <dt>Клиенты</dt>
+            <dd>{companies.length}</dd>
+          </div>
+        </dl>
+
+        <section className="overview-section" aria-labelledby="recent-projects-title">
+          <div className="section-heading">
             <div>
-              <label htmlFor="invite-email">Email участника</label>
-              <input id="invite-email" name="email" type="email" required />
+              <p className="section-label">Маршруты</p>
+              <h2 id="recent-projects-title">Проекты в работе</h2>
             </div>
-            <button type="submit">Отправить приглашение</button>
-          </form>
-          {invitations.length === 0 ? (
-            <p className="empty">Активных и недавних приглашений пока нет.</p>
+            <Link className="text-link compact-link" href={`/workspace/${slug}/projects`}>
+              Смотреть все
+            </Link>
+          </div>
+          {active.length === 0 ? (
+            <div className="empty-state">
+              <h3>Активных проектов пока нет</h3>
+              <p>Создайте первый проект — здесь появятся прогресс и ожидающая сторона.</p>
+            </div>
           ) : (
-            <ul className="compact-list">
-              {invitations.map((item) => (
-                <li key={item.id}>
-                  <span>
-                    {item.email}
-                    <small>
-                      {item.status} · до {item.expiresAt.toLocaleString('ru-RU')}
-                    </small>
-                  </span>
-                  {item.status === 'pending' ? (
-                    <span className="mini-actions">
-                      <form
-                        action={`/api/workspaces/${slug}/invitations/${item.id}/resend`}
-                        method="post"
-                      >
-                        <button className="secondary" type="submit">
-                          Повторить
-                        </button>
-                      </form>
-                      <form
-                        action={`/api/workspaces/${slug}/invitations/${item.id}/revoke`}
-                        method="post"
-                      >
-                        <label className="confirm-control">
-                          <input name="confirm" type="checkbox" value="yes" required />
-                          Подтвердить отзыв
-                        </label>
-                        <button className="danger" type="submit">
-                          Отозвать
-                        </button>
-                      </form>
-                    </span>
-                  ) : null}
-                </li>
-              ))}
+            <ul className="route-list">
+              {active.slice(0, 5).map((item) => {
+                const route = routeByProject.get(item.id);
+                return (
+                  <li key={item.id}>
+                    <Link href={`/workspace/${slug}/projects/${item.slug}`}>
+                      <span className="route-list-main">
+                        <strong>{item.name}</strong>
+                        <small>
+                          {item.companyName} · до {formatDate(item.plannedEndDate)}
+                        </small>
+                      </span>
+                      <span className="route-list-state">
+                        <span>{route?.progressPercent ?? 0}%</span>
+                        <small>
+                          {route?.blockingAction
+                            ? `Ожидает клиента: ${route.blockingAction.title}`
+                            : projectStatusLabels[item.status]}
+                        </small>
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>
+      </main>
+    );
+  }
+
+  const workflows = await Promise.all(
+    projects.slice(0, 12).map((item) => getProjectWorkflow(database.db, tenant, item.slug)),
+  );
+  const projectRoutes = projects.map((item, index) => ({ item, workflow: workflows[index] }));
+  const withAction = projectRoutes.find(({ workflow }) => workflow?.nextAction);
+  const primary = withAction ?? projectRoutes[0];
+
+  return (
+    <main className="workspace-shell client-overview">
+      <header className="page-header">
+        <div>
+          <p className="eyebrow">Ваше рабочее пространство</p>
+          <h1>Здравствуйте, {identity.user.name.split(' ')[0]}</h1>
+          <p className="lede">Здесь собраны только проекты и действия, доступные вам.</p>
+        </div>
+      </header>
+      {primary ? (
+        <section className="attention-panel client-attention" aria-labelledby="client-action-title">
+          <div>
+            <p className="section-label">
+              {primary.workflow?.nextAction ? 'От вас требуется действие' : 'Сейчас'}
+            </p>
+            <h2 id="client-action-title">
+              {primary.workflow?.nextAction?.title ?? 'От вас пока ничего не требуется'}
+            </h2>
+            <p>
+              {primary.workflow?.nextAction?.description ??
+                'Разработчик продолжает работу. Новое действие появится здесь, когда понадобится ваше участие.'}
+            </p>
+          </div>
+          <Link
+            className="button-primary"
+            href={`/workspace/${slug}/projects/${primary.item.slug}${
+              primary.workflow?.nextAction ? '/workflow' : ''
+            }`}
+          >
+            {primary.workflow?.nextAction ? 'Перейти к действию' : 'Открыть проект'}
+          </Link>
+        </section>
+      ) : (
+        <div className="empty-state">
+          <h2>Проекты пока не назначены</h2>
+          <p>Владелец рабочего пространства сообщит, когда откроет вам доступ.</p>
+        </div>
+      )}
+      {projectRoutes.length > 0 ? (
+        <section className="overview-section" aria-labelledby="client-projects-title">
+          <div className="section-heading">
+            <div>
+              <p className="section-label">Доступные вам</p>
+              <h2 id="client-projects-title">Проекты</h2>
+            </div>
+          </div>
+          <ul className="route-list">
+            {projectRoutes.map(({ item, workflow }) => (
+              <li key={item.id}>
+                <Link href={`/workspace/${slug}/projects/${item.slug}`}>
+                  <span className="route-list-main">
+                    <strong>{item.name}</strong>
+                    <small>{item.companyName}</small>
+                  </span>
+                  <span className="route-list-state">
+                    <span>{workflow?.progressPercent ?? 0}%</span>
+                    <small>
+                      {workflow?.nextAction
+                        ? 'Нужно ваше действие'
+                        : projectStatusLabels[item.status]}
+                    </small>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
-      <section className="panel" aria-labelledby="sessions-title">
-        <p className="eyebrow">Безопасность</p>
-        <h2 id="sessions-title">Ваши активные сессии</h2>
-        <ul className="rows">
-          {sessions.map((item) => (
-            <li key={item.id}>
-              <div>
-                <strong>{item.userAgent || 'Неизвестное устройство'}</strong>
-                <span>
-                  Создана {item.createdAt.toLocaleString('ru-RU')} · до{' '}
-                  {item.expiresAt.toLocaleString('ru-RU')}
-                </span>
-              </div>
-              <form action={`/api/sessions/${item.id}/revoke`} method="post">
-                <label className="confirm-control">
-                  <input name="confirm" type="checkbox" value="yes" required />
-                  Подтвердить
-                </label>
-                <button className="secondary" type="submit">
-                  Отозвать
-                </button>
-              </form>
-            </li>
-          ))}
-        </ul>
-      </section>
     </main>
   );
 }

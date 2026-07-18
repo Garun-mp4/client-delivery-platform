@@ -4,7 +4,6 @@ import { notFound } from 'next/navigation';
 import { can } from '@garun/core/identity';
 import { listClientCompanies } from '@garun/core/projects';
 
-import { WorkspaceNav } from '../_components/workspace-nav';
 import { requireTenantPage } from '@/lib/page-tenant';
 import { database } from '@/lib/server';
 
@@ -21,20 +20,19 @@ export default async function ClientsPage({
   const companies = await listClientCompanies(database.db, tenant);
   return (
     <main className="workspace-shell">
-      <header className="workspace-header">
+      <header className="page-header">
         <div>
           <p className="eyebrow">Клиенты</p>
           <h1>Компании заказчиков</h1>
           <p className="muted">Внутренние заметки доступны только вашей команде.</p>
         </div>
       </header>
-      <WorkspaceNav slug={slug} internal />
       {feedback.error ? (
         <p className="notice error" role="alert">
           Клиента создать не удалось. Проверьте обязательные поля и формат сайта или email.
         </p>
       ) : null}
-      <section className="panel" aria-labelledby="clients-list-title">
+      <section className="overview-section" aria-labelledby="clients-list-title">
         <div className="section-heading">
           <div>
             <p className="eyebrow">Список</p>
@@ -58,7 +56,7 @@ export default async function ClientsPage({
           </ul>
         )}
       </section>
-      <section className="panel" aria-labelledby="create-client-title">
+      <section className="panel form-section" aria-labelledby="create-client-title">
         <p className="eyebrow">Новый клиент</p>
         <h2 id="create-client-title">Создать компанию</h2>
         <form className="form-grid" action={`/api/workspaces/${slug}/clients`} method="post">

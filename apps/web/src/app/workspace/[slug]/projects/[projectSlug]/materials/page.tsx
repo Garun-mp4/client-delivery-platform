@@ -6,7 +6,7 @@ import { canAccessProject } from '@garun/core/projects';
 import { listQuestionnaireAssignees } from '@garun/core/questionnaires';
 
 import { MaterialUploader } from './material-uploader';
-import { WorkspaceNav } from '../../../_components/workspace-nav';
+import { ProjectNav } from '../_components/project-nav';
 import { requireTenantPage } from '@/lib/page-tenant';
 import { database } from '@/lib/server';
 
@@ -62,7 +62,7 @@ export default async function MaterialsPage({
 
   return (
     <main className="workspace-shell">
-      <header className="workspace-header">
+      <header className="page-header">
         <div>
           <p className="eyebrow">Передача контента</p>
           <h1>Материалы проекта</h1>
@@ -74,7 +74,7 @@ export default async function MaterialsPage({
           К проекту
         </Link>
       </header>
-      <WorkspaceNav slug={slug} internal={internal} />
+      <ProjectNav projectSlug={projectSlug} workspaceSlug={slug} />
       {feedback.success ? (
         <p className="notice success" role="status">
           Операция выполнена.
