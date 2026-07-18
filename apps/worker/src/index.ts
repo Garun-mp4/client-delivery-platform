@@ -10,6 +10,7 @@ import { ClamAvScanner, S3ObjectStorage } from '@garun/storage';
 import { createWorkerHealthResponse } from './health';
 import { startFileProcessor } from './files';
 import { startOutboxDispatcher } from './outbox';
+import { startUrlChecker } from './url-checks';
 
 const environment = parseWorkerEnv();
 const logger = createLogger({
@@ -20,6 +21,7 @@ const logger = createLogger({
 const database = createDatabaseClient(environment.DATABASE_URL);
 const stopOutbox = startOutboxDispatcher(database.pool, environment, logger);
 const stopFiles = startFileProcessor(database.pool, environment, logger);
+const stopUrlChecks = startUrlChecker(database.pool, environment.PUBLIC_APP_URL, logger);
 
 function sendJson(response: ServerResponse, statusCode: number, body: unknown, requestId: string) {
   response.writeHead(statusCode, {
@@ -102,6 +104,7 @@ function shutdown(signal: NodeJS.Signals) {
   logger.info({ signal }, 'Worker shutdown requested');
   stopOutbox();
   stopFiles();
+  stopUrlChecks();
   server.close((error) => {
     if (error) {
       logger.error({ errorCode: 'WORKER_SHUTDOWN_FAILED' }, 'Worker shutdown failed');
