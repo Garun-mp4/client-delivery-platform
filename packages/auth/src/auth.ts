@@ -26,6 +26,7 @@ export function createAuth(
   environment: AuthEnvironment,
   allowBootstrapSignup = false,
   deliverMagicLink?: (message: { email: string; url: string }) => Promise<void>,
+  magicLinkRateLimitMax = 5,
 ) {
   return betterAuth({
     appName: environment.APP_NAME,
@@ -68,7 +69,7 @@ export function createAuth(
         disableSignUp: true,
         expiresIn: environment.MAGIC_LINK_TTL_SECONDS,
         storeToken: 'hashed',
-        rateLimit: { window: 60, max: 5 },
+        rateLimit: { window: 60, max: magicLinkRateLimitMax },
         async sendMagicLink({ email, url }) {
           if (deliverMagicLink) {
             await deliverMagicLink({ email: normalizeEmail(email), url });
@@ -102,9 +103,15 @@ export async function createInvitationSessionResponse(
   input: { email: string; callbackURL: string; headers: Headers },
 ) {
   let verificationUrl: string | undefined;
-  const invitationAuth = createAuth(database, environment, false, async ({ url }) => {
-    verificationUrl = url;
-  });
+  const invitationAuth = createAuth(
+    database,
+    environment,
+    false,
+    async ({ url }) => {
+      verificationUrl = url;
+    },
+    20,
+  );
   await invitationAuth.api.signInMagicLink({
     body: {
       email: normalizeEmail(input.email),
