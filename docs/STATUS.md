@@ -1,151 +1,114 @@
 # Статус реализации
 
 Последнее обновление: 2026-07-18
-Общий статус: Milestones 00–06 и UX stabilization Milestone 06.5 завершены
+Общий статус: Milestones 00–07 и UX stabilization Milestone 06.5 завершены
 
 ## Текущий milestone
 
-**Milestone 06.5 — UX foundation, application shell и производительность — завершён в
-`feat/milestone-06-5-ux-foundation`.** Реализованы role-based overview/navigation, signature
-`ProjectRoute`, единая дизайн-система, упрощённый первый путь и production-oriented performance
-review. Milestone 07 не начат.
+**Milestone 07 — обновления, версии сайта и review loop — завершён в
+`feat/milestone-07-review-loop`.** Реализован рабочий путь от публикации обновления и безопасно
+проверенной версии до клиентского замечания, исправления, проверки и закрытия. Milestone 08 не начат.
+
+Ветка Milestone 07 построена поверх `feat/milestone-06-5-ux-foundation`, поскольку на момент начала
+UX-ветка ещё не была объединена в `main`. При создании PR необходимо сохранять порядок merge:
+сначала Milestone 06.5, затем Milestone 07.
 
 ## Завершённые задачи
 
-- Добавлены понятный public entry, выбор password/magic-link без двух последовательных писем,
-  role-based application shell и отдельные overview владельца и клиента.
-- Созданы desktop sidebar, mobile header/bottom navigation, локальная навигация проекта и
-  `ProjectRoute` с состоянием, ответственностью, следующим результатом и нативным progress.
-- Настройки, участники, приглашения и archive вынесены в progressive disclosure; основные формы
-  получили pending/duplicate-submit protection, а access actions возвращают пользователя в раздел
-  «Доступ».
-- Дизайн переведён на общие warm-paper/graphite/green tokens; UI package синхронизирован с системой,
-  contrast исправлен по axe desktop/mobile.
-- Tenant resolution внутри layout/page дедуплицирован через React `cache`; добавлены loading
-  skeleton, skip targets и reduced-motion/mobile правила.
-- Добавлены `Material`, `MaterialRevision`, `FileObject` и `FileLink` с tenant/project composite
-  constraints, историей ревизий и отдельными current/final projections.
-- Реализованы material requests, назначение клиенту, связанный `ActionItem`, audit/outbox событие,
-  ответы файлом, текстом или ссылкой, review `accept/clarify`, замена версии и сохранение истории.
-- Добавлен `packages/storage` с S3-compatible adapter для MinIO/R2, приватным bucket, короткими
-  presigned PUT/GET, подписанными length/MIME/checksum metadata и повторной авторизацией download.
-- Реализованы allowlist и server-side MIME sniffing, нормализация имени, random object key,
-  конфигурируемые лимит 100 MiB и quota 10 GiB с резервированием initiated uploads.
-- Worker выполняет claims через PostgreSQL `SKIP LOCKED`, SHA-256, MIME verification, ClamAV scan,
-  retries/backoff, reclaim зависших jobs, WebP preview с удалением EXIF и атомарный переход в
-  `available` вместе с revision/action/audit/outbox.
-- Файлы `pending/scanning` не попадают в клиентские DTO и не получают download URL; заражённые и
-  исчерпавшие retry файлы остаются недоступными.
-- Добавлена безопасная очистка незавершённых uploads; временный сбой БД или storage логируется
-  стабильным кодом и не создаёт необработанный background rejection.
-- Поля анкет `file` и `image` включены через тот же quarantine pipeline и проверяются при submit.
-- Добавлена русскоязычная mobile-friendly страница материалов с поиском по metadata/category,
-  multi-upload, progress, review, preview image/PDF и signed download.
-- Readiness web проверяет PostgreSQL, Redis и storage; readiness worker дополнительно проверяет
-  scanner. Liveness не зависит от внешних сервисов.
-- Локальный Compose дополнен ClamAV и idempotent storage initialization; CORS и CSP разрешают только
-  настроенный origin object storage.
-- Созданы миграции `0008`–`0011`, ADR-035–037, `docs/MATERIALS_AND_FILES.md` и обновлены README,
-  env examples, CI и Docker build context.
+- Добавлена project feed модель с client/internal visibility, важностью и одним pin на видимость.
+- Добавлена append-only `SiteVersion`: последовательный номер, окружение, changelog, инструкции,
+  публичный/password access и история старых опубликованных версий.
+- Worker асинхронно выполняет SSRF-safe URL check: проверяет scheme/port, все DNS IPv4/IPv6,
+  специальные диапазоны и каждый redirect, закрепляет соединение за проверенным IP и применяет
+  timeout/redirect limits.
+- Security и availability URL хранятся отдельно. Unsafe URL не имеет override; safe-but-unreachable
+  требует явного подтверждения. Проверка старше 10 минут перед публикацией инвалидируется.
+- Preview secret хранится только зашифрованным и раскрывается динамической server page после
+  повторной tenant/project policy; URL, пароль и полный ответ сайта не пишутся в audit/log.
+- Реализован `FeedbackItem` с version/page/screenshot/priority/classification и явной state machine
+  `new → … → awaiting_verification → closed`.
+- `potential_change` отделён от change request; Milestone 08 и коммерческий workflow не начаты.
+- `Comment` отделён от workflow: client/internal visibility, edit marker и tombstone; client query
+  исключает internal replies до serializer/render.
+- Скриншот замечания может ссылаться только на собственный clean/available файл того же
+  workspace/project.
+- Добавлены русскоязычный mobile-friendly review screen, pending/empty/error states, new-tab fallback,
+  owner publication controls и клиентские действия проверки.
+- Каждая значимая мутация tenant-scoped, проходит server policy и создаёт audit/outbox event.
+- Исправлена конкуренция Better Auth rate limit: публичный magic-link остаётся 5/min, внутреннее
+  создание session после уже валидного invitation имеет отдельный защищённый лимит.
+- Созданы миграции `0012`–`0014`, ADR-040–041 и `docs/REVIEW_LOOP.md`; README обновлён.
 
 ## Текущие задачи
 
-- Подготовить Pull Request и дождаться итогового CI для ветки Milestone 06.5.
-- Milestone 07 не начат.
+- Подготовить коммиты и отправить `feat/milestone-07-review-loop`.
+- Дождаться итогового GitHub Actions run.
+- Milestone 08 не начинать до merge и отдельного подтверждения.
 
 ## Найденные проблемы
 
-- UX E2E обнаружил недостаточный contrast вторичного текста; токены усилены до WCAG AA.
-- После административных действий redirect возвращал владельца на overview вместо исходного раздела;
-  invitation/member actions теперь возвращаются в «Доступ», а client invitation повторно раскрывает
-  соответствующий блок.
-- Внутренний member без project assignment видел ссылку «Сеансы», но получал 404. Tenant-backed
-  session management больше не зависит от project membership.
-- Первый локальный E2E-запуск выполнялся со старым `apps/web/.env` без storage-переменных и CSP
-  блокировал browser PUT. Повторная проверка использовала полный набор из актуального `.env.example`;
-  чистая установка и CI уже задают эти переменные явно.
-- Generated migrations первоначально создавали tenant composite foreign keys раньше supporting
-  unique indexes. SQL переупорядочен; полный путь `0000`–`0011` проверен на чистой PostgreSQL 17.
-- Исторические membership foreign keys использовали `RESTRICT`, поэтому очистка integration fixtures
-  конфликтовала с новыми material references. Добавлена явная upgrade migration `0011`, меняющая
-  только нужные связи на `CASCADE`.
-- MinIO не реализует S3 `PutBucketCors` и возвращает 501. Local CORS задаётся явной переменной
-  контейнера с разрешёнными origins; adapter не маскирует другие ошибки.
-- Первые presigned PUT не подписывали browser-controlled headers, из-за чего MinIO отвергал metadata
-  и Content-Type. Headers переведены в signable/unhoistable contract и проверены реальной загрузкой.
-- CSP сначала блокировал прямой browser PUT. Настроенный storage origin добавлен в `connect-src`;
-  `upgrade-insecure-requests` включается только для HTTPS public application URL.
-- Worker SQL имел неоднозначный вывод enum/JSON параметров в PostgreSQL. Добавлены явные casts,
-  переход `available` сделан транзакционным.
-- Questionnaire submit повторно разбирал schema с отключёнными file fields. Для Milestone 06
-  серверный re-parse явно разрешает file/image и всё равно проверяет ownership/status.
-- Stateful E2E-сценарии случайно дублировались mobile Playwright project. Они запускаются один раз со
-  своей mobile viewport; foundation/axe остаются desktop+mobile.
-- Финальный integration-запуск дважды остановился до полного набора из-за неполной локальной команды:
-  сначала отсутствовал `TEST_DATABASE_URL`, затем `TEST_MINIO_*`. После задания документированного
-  набора переменных тесты прошли 26/26; дефекта приложения эти попытки не выявили.
-- Финальный review обнаружил возможность необработанного rejection при отказе БД во время записи
-  retry-состояния или cleanup query. Оба пути теперь перехватываются и безопасно логируются.
+- Первая версия migration создавала composite foreign keys раньше supporting unique indexes. SQL
+  `0012` переупорядочен и полностью применён на чистой PostgreSQL 17.
+- Integration cleanup выявил конфликт `RESTRICT` membership-author foreign keys при cascade удаления
+  тестового workspace. Для новых сущностей добавлена явная migration `0013`, согласующая delete
+  semantics с существующими domain tables; пользовательские memberships удаляются soft-disable.
+- После добавления freshness gate integration fixture не задавала `checkedAt`; fixture исправлена и
+  теперь проверяет актуальный safe result.
+- Первый полный E2E не дождался письма за 5 секунд при параллельной outbox-нагрузке. Poll timeout
+  приведён к уже используемому integration SLA без ослабления assertion.
+- Второй полный E2E выявил общий Better Auth plugin limit для публичного magic-link и внутреннего
+  session flow принятого invitation. Membership создавался, но session fallback уводил на общую
+  страницу. Потоки получили отдельные лимиты; повторный полный E2E прошёл 20/20.
+- Финальный review выявил конфликт повторной публикации уже видимой версии с freshness constraint и
+  исчерпание retry counter при новой проверке. Публикация стала идемпотентной, новый check cycle
+  сбрасывает счётчик, а история допускает одинаковый относительный номер попытки в разных циклах.
+- Первый `pnpm db:generate` в текущей shell завершился ошибкой из-за отсутствующего `DATABASE_URL`.
+  После явного test URL команда прошла и подтвердила отсутствие drift.
 
 ## Принятые решения
 
-- ADR-038: один role-based shell и `ProjectRoute` являются общей UX-основой без ослабления server
-  policies или tenant isolation.
-- ADR-039: performance оценивается на production build; development cold compilation фиксируется
-  отдельно и не считается production latency.
-- ADR-035: прямой приватный upload/download через заменяемый S3-compatible adapter; web не
-  проксирует файлы до 100 MiB.
-- ADR-036: обязательный асинхронный quarantine pipeline; публикация при недоступном scanner
-  запрещена, PostgreSQL является текущей job queue.
-- ADR-037: material revisions append-only, quota резервируется до upload, файловые поля анкет
-  используют тот же `FileObject`.
-- Local incomplete upload retention — 24 часа; значение конфигурируемо. Production storage/scanner и
-  окончательная retention policy остаются предварительными.
-- Новые production dependencies ограничены `packages/storage` (`@aws-sdk/client-s3`,
-  `@aws-sdk/s3-request-presigner`) и worker (`sharp`); причины и альтернативы записаны в ADR.
+- ADR-040: URL security и availability — разные оси; публикация использует свежий SSRF-safe result,
+  версии append-only, а workflow принадлежит `FeedbackItem`, не `Comment`.
+- ADR-041: внутренний invitation-to-session flow имеет отдельный rate limit, не ослабляя публичный
+  magic-link и endpoint принятия приглашения.
+- Основной review UX не зависит от iframe: new-tab всегда доступен, iframe capability оценивается
+  консервативно по X-Frame-Options/CSP.
+- PostgreSQL остаётся текущей лёгкой job queue; новая production dependency или микросервис не
+  добавлялись.
 
 ## Выполненные проверки
 
-- `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`,
-  `pnpm test` — успешно; core 35/35, storage 5/5, остальные unit suites зелёные.
-- Чистая БД `garun_m06_final`: migrations `0000`–`0011` применены успешно; `pnpm db:generate`
-  сообщил `No schema changes`.
-- `pnpm test:integration` — 26/26 после корректной настройки test env; проверены реальные
-  PostgreSQL, Redis, MinIO, Mailpit, clean/EICAR ClamAV, quota, transactions и tenant/IDOR.
-- `pnpm build` и `pnpm verify:artifacts` — успешно; production web собран, worker artifact не
-  импортирует workspace TypeScript source.
-- `pnpm test:e2e` — 17/17; material path включает приглашение клиента, browser PUT, quarantine,
-  реальный scan, signed download, acceptance, IDOR denial и axe smoke.
-- UX regression suite — 19/19 на production build: entry/login desktop+mobile, role-based shell,
-  password/magic-link, invitations, project workflow, questionnaires, materials, session loss и axe.
-  Отдельный targeted identity rerun — 2/2 после исправления доступа member к собственным сессиям.
-- `docker compose -f infra/compose.yaml up -d --build --wait` — успешно; migration/storage-init
-  exited 0, web/worker/PostgreSQL/Redis/MinIO/Mailpit/ClamAV healthy.
-- `pnpm smoke` — web и worker успешно. Liveness не раскрывает зависимости; readiness показывает
-  только безопасные статусы `database/redis/storage/scanner`.
-- `pnpm audit --prod` — известных уязвимостей нет.
-- `git diff --check`, tracked artifact scan, high-confidence secret scan, Compose log scan,
-  type-suppression scan — успешно.
-- Workspace dependency graph проверен как ацикличный.
+- `pnpm format`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test` — успешно; core
+  39/39, worker 18/18, web 14/14 и остальные suites зелёные.
+- `pnpm db:generate` — `No schema changes`; migrations `0000`–`0014` применены к чистой базе
+  `garun_m07_verify` без ошибок.
+- `pnpm test:integration` — 29/29 на реальных PostgreSQL, Redis, MinIO, Mailpit и ClamAV.
+- `pnpm build` — production Next.js и worker собраны; `pnpm verify:artifacts` подтвердил отсутствие
+  workspace TypeScript imports в worker artifact.
+- `pnpm test:e2e` — итоговый полный прогон 20/20; review path включает client invitation, publication,
+  structured feedback, owner transitions, client close и axe.
+- `docker compose up -d --build --wait` — migration/storage-init exited 0; web, worker, PostgreSQL,
+  Redis, MinIO, Mailpit и ClamAV healthy.
+- `pnpm smoke` — web/worker passed; `pnpm audit --prod` — известных уязвимостей нет.
+- `git diff --check`, tracked env/artifact scan, high-confidence secret scan, type-suppression scan и
+  Compose error/secret log scan — успешно.
 
 ## Следующие действия
 
-1. Создать Pull Request ветки `feat/milestone-06-5-ux-foundation` и дождаться зелёного CI.
-2. После merge и отдельного подтверждения перейти к Milestone 07 — обновления, версии сайта и review
-   loop.
+1. Создать Pull Request Milestone 06.5, если он ещё не создан, и объединить его первым.
+2. Создать Pull Request `feat/milestone-07-review-loop`, проверить CI и объединить после 06.5.
+3. После отдельного подтверждения перейти к Milestone 08 — общие согласования и audit trail.
 
 ## Известные ограничения
 
-- Production RUM/APM ещё не подключён: окончательные latency percentiles появятся после выбора
-  hosting и наблюдаемости. Локальные production E2E измерения зафиксированы в `docs/UX_FOUNDATION.md`.
-- Cloudflare R2, production ClamAV deployment, домен и реальные credentials не создавались; они
-  остаются предварительными provider choices.
-- Multipart/resumable upload не входит в Milestone 06; один файл ограничен 100 MiB.
-- PDF preview использует проверенный оригинал inline; отдельный raster thumbnail создаётся только для
-  изображений.
-- Physical purge после 30-day deleted-file grace и пользовательский UI удаления относятся к
-  последующей retention/operations работе; очистка незавершённых uploads уже работает.
-- Глубокий content search, public shares, cloud-drive integrations, client-side editing и ZIP export
-  намеренно не входят в milestone.
-- RLS отложен; isolation обеспечивается server policies, scoped services, composite constraints и
-  cross-tenant/IDOR tests.
+- iframe embedding намеренно не включён: внешние CSP/X-Frame-Options и platform CSP делают new-tab
+  единственным гарантированным путем. Capability result хранится для будущего безопасного UX.
+- URL checker использует консервативный HTTP `HEAD`; protected preview может быть
+  `safe/unreachable` и требует ручного подтверждения, но unsafe security result не переопределяется.
+- Screenshot создаётся через существующий файловый контур; автоматический browser screenshot, DOM
+  locator/overlay, SDK, console capture и real-time не входят в Milestone 07.
+- `potential_change` — только явная классификация. Полноценный change request и коммерческое решение
+  относятся к последующим milestones.
+- Production domain, R2, scanner deployment, RUM/APM и credentials не создавались.
+- PostgreSQL RLS отложен; isolation обеспечивается server policies, scoped queries, composite
+  constraints и cross-tenant/IDOR tests.

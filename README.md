@@ -1,10 +1,10 @@
 # Garun Workspace
 
-Client Delivery Platform. **Milestone 06** добавляет запросы материалов, неизменяемые редакции и
-прямую загрузку в приватное S3-совместимое хранилище. Файл остаётся в карантине до MIME/checksum и
-ClamAV-проверки; доступ выдаётся только короткой подписанной ссылкой после повторной tenant/project
-авторизации. Identity, deny-by-default RBAC, tenant isolation, audit trail и transactional outbox
-сохранены как серверная граница доступа.
+Client Delivery Platform. **Milestone 07** добавляет ленту обновлений, проверяемые версии сайта и
+структурированный review loop. URL проверяется worker до публикации клиенту; unsafe адрес нельзя
+обойти вручную. Замечание имеет явный workflow, а обычные и внутренние комментарии остаются
+отдельными сообщениями. Identity, deny-by-default RBAC, tenant isolation, audit trail и
+transactional outbox сохранены как серверная граница доступа.
 
 ## Требования
 
@@ -144,6 +144,13 @@ checksum и фактический MIME, запускает ClamAV, удаляе
 шаг. Клиент видит отдельную «Главную» только со своими проектами и требуемым действием. Настройки
 проекта, участники, клиентские приглашения и архив находятся в раскрывающихся блоках на странице
 проекта, чтобы не перегружать ежедневный рабочий путь.
+
+Во вкладке проекта «Проверка» владелец публикует обновление и добавляет неизменяемую URL-версию с
+описанием изменений и инструкцией. Пока worker не завершил SSRF-safe проверку, клиент версию не
+видит. Безопасная, но недоступная извне preview-версия требует явного подтверждения; unsafe URL
+никогда не публикуется. Клиент открывает версию в новой вкладке, оставляет структурированное
+замечание и после исправления закрывает его. Обычный комментарий статус не меняет, internal reply
+клиенту не передаётся. Подробный flow описан в `docs/REVIEW_LOOP.md`.
 
 Локальные ограничения задаются в `infra/.env`: по умолчанию 100 MiB на файл, 10 GiB на workspace,
 15 минут для upload URL, 60 секунд для download URL и 24 часа до очистки незавершённой загрузки.
@@ -289,4 +296,7 @@ transport/composition, а project/client policies и мутации находя
 - `docs/CLIENTS_AND_PROJECTS.md` — компании, проекты, memberships и публикация;
 - `docs/SCOPE_STAGES_ACTIONS.md` — scope agreement, этапы, actions, progress и client next action;
 - `docs/QUESTIONNAIRES.md` — schema, autosave/revision flow, permissions и privacy анкет;
+- `docs/MATERIALS_AND_FILES.md` — quarantine, версии материалов, ACL и файловый worker;
+- `docs/UX_FOUNDATION.md` — role-based shell, дизайн-система и performance baseline;
+- `docs/REVIEW_LOOP.md` — updates, SiteVersion, SSRF-safe URL checks и feedback workflow;
 - `AGENTS.md` — правила работы Codex.
