@@ -1,15 +1,14 @@
 # Статус реализации
 
 Последнее обновление: 2026-07-18
-Общий статус: Milestones 00–06 завершены
+Общий статус: Milestones 00–06 завершены; Milestone 06.5 выполняется
 
 ## Текущий milestone
 
-**Milestone 06 — материалы и безопасные файлы — завершён в
-`feat/milestone-06-files-materials`.** Реализован приватный versioned workflow материалов,
-quarantine pipeline с обязательной проверкой ClamAV, прямые подписанные загрузки в S3-compatible
-storage, безопасная выдача файлов, quota reservation, очистка незавершённых загрузок и файловые поля
-анкет. Milestone 07 не начат.
+**Milestone 06.5 — UX foundation, application shell и производительность — выполняется в
+`feat/milestone-06-5-ux-foundation`.** Утверждены role-based overview/navigation, signature
+`ProjectRoute`, единая дизайн-система, упрощённый первый путь и измеримый performance review.
+Milestone 07 не начат.
 
 ## Завершённые задачи
 
@@ -40,8 +39,10 @@ storage, безопасная выдача файлов, quota reservation, оч
 
 ## Текущие задачи
 
-- Активных задач реализации Milestone 06 нет.
-- Требуется создать Pull Request и провести обычную проверку ветки в GitHub Actions.
+- Зафиксировать UX foundation и провести baseline audit.
+- Реализовать application shell, overview владельца/клиента и project navigation.
+- Упростить public entry/login и унифицировать form feedback.
+- Измерить production navigation, пройти mobile/keyboard/axe и regression tests.
 - Milestone 07 не начат.
 
 ## Найденные проблемы

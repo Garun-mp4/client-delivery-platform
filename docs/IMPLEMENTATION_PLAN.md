@@ -192,6 +192,49 @@ Milestones 01–10 образуют первый рабочий MVP. Milestones 
 
 **Не входит.** Content search, public shares, cloud-drive integrations, client-side editing и full ZIP export.
 
+## 9.5. Milestone 06.5 — UX foundation, application shell и производительность
+
+**Цель.** До расширения продукта привести реализованные Milestones 01–06 к состоянию, в котором
+владелец и клиент без отдельной инструкции понимают текущее состояние, следующее действие и
+навигацию, а обычные взаимодействия дают немедленную обратную связь.
+
+**Функции.** Role-based workspace overview; единый application shell; project-local navigation;
+signature `ProjectRoute`; понятный public entry; упрощённый login/invitation path без ослабления
+security; empty/loading/success/error/read-only states; pending submit protection; mobile navigation;
+performance baseline development/production и устранение измеренных узких мест.
+
+**Модули и файлы.** `apps/web` layouts/pages/components/loading; `packages/ui`; существующие query
+services только для безопасных role/tenant-scoped overview; `docs/UX_FOUNDATION.md`;
+`.interface-design/system.md`; E2E/axe/performance smoke.
+
+**База данных.** Новые business tables не требуются. Индексы допускаются только при подтверждённом
+query plan; migration проходит обычный clean/upgrade review.
+
+**Безопасность.** Shell и скрытие навигации не заменяют server policies. Overview получает данные
+только через session → tenant context → project membership. Client copy/DTO не раскрывают internal
+actions, workspace data или существование чужих объектов. Session/cookie/redirect/CSRF правила не
+ослабляются ради сокращения шагов.
+
+**Тесты.** Unit для navigation/copy/route derivation и pending controls; integration для
+role/tenant-scoped overview; E2E owner/client first action, persistent session, no dead-end navigation,
+mobile/keyboard/axe; production navigation/performance smoke; regression Milestones 01–06.
+
+**Команды проверки.** Standard quality gate; существующие integration/E2E/security/axe suites;
+production build smoke; измерение route timings документированной командой. Отдельные scripts не
+создаются только ради названия, если покрытие уже находится в существующем suite.
+
+**Критерии приёмки.** Public entry ведёт к одному понятному действию; действующая session не требует
+повторного входа; владелец и клиент получают разные overview/navigation; ключевая функция доступна
+не более чем за два осмысленных перехода; project overview показывает состояние, ответственность и
+следующее действие; основные forms имеют pending/success/error и защиту от повторной отправки;
+production показатели измерены до/после; desktop/mobile axe и E2E зелёные; tenant/security границы
+не изменены.
+
+**Зависимости.** Milestone 06. Milestone 07 начинается только после завершения этого milestone.
+
+**Не входит.** Business scope Milestone 07, dark mode, real-time, сложная motion system, marketing
+landing, public SaaS onboarding и визуальные изменения без практической UX-пользы.
+
 ## 10. Milestone 07 — обновления, версии сайта и review loop
 
 **Цель.** Разработчик публикует проверяемый результат, клиент оставляет и закрывает структурированные замечания без SDK.
