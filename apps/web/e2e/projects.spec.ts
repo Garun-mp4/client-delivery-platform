@@ -49,7 +49,9 @@ test('owner publishes one project and grants then revokes explicit client access
   await expect(page).toHaveURL(/\/workspace\/e2e-studio/);
 
   await page.goto('/workspace/e2e-studio/clients');
-  await page.locator('summary').filter({ hasText: 'Создать компанию' }).click();
+  if (!(await page.getByLabel('Название компании').isVisible())) {
+    await page.locator('summary').filter({ hasText: 'Создать компанию' }).click();
+  }
   await page.getByLabel('Название компании').fill(companyName);
   await page.getByLabel('Email', { exact: true }).fill(clientEmail);
   await page.getByLabel('Внутренние заметки').fill(internalNote);
@@ -57,7 +59,9 @@ test('owner publishes one project and grants then revokes explicit client access
   await expect(page.getByRole('heading', { name: companyName })).toBeVisible();
 
   await page.goto('/workspace/e2e-studio/projects');
-  await page.locator('summary').filter({ hasText: 'Создать черновик' }).click();
+  if (!(await page.getByLabel('Название проекта').isVisible())) {
+    await page.locator('summary').filter({ hasText: 'Создать черновик' }).click();
+  }
   await page.getByLabel('Название проекта').fill(projectName);
   await page.getByLabel('Адрес проекта').fill(projectSlug);
   await page.getByLabel('Компания клиента').selectOption({ label: companyName });

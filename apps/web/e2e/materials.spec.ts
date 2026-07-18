@@ -51,11 +51,15 @@ test('client uploads a quarantined material that becomes available and is accept
   await expect(page).toHaveURL(/\/workspace\/e2e-studio/);
 
   await page.goto('/workspace/e2e-studio/clients');
-  await page.locator('summary').filter({ hasText: 'Создать компанию' }).click();
+  if (!(await page.getByLabel('Название компании').isVisible())) {
+    await page.locator('summary').filter({ hasText: 'Создать компанию' }).click();
+  }
   await page.getByLabel('Название компании').fill(companyName);
   await page.getByRole('button', { name: 'Создать клиента' }).click();
   await page.goto('/workspace/e2e-studio/projects');
-  await page.locator('summary').filter({ hasText: 'Создать черновик' }).click();
+  if (!(await page.getByLabel('Название проекта').isVisible())) {
+    await page.locator('summary').filter({ hasText: 'Создать черновик' }).click();
+  }
   await page.getByLabel('Название проекта').fill(projectName);
   await page.getByLabel('Адрес проекта').fill(projectSlug);
   await page.getByLabel('Компания клиента').selectOption({ label: companyName });
