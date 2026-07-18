@@ -18,6 +18,7 @@ COPY --chown=node:node packages/contracts/package.json packages/contracts/packag
 COPY --chown=node:node packages/core/package.json packages/core/package.json
 COPY --chown=node:node packages/db/package.json packages/db/package.json
 COPY --chown=node:node packages/observability/package.json packages/observability/package.json
+COPY --chown=node:node packages/storage/package.json packages/storage/package.json
 COPY --chown=node:node packages/ui/package.json packages/ui/package.json
 COPY --chown=node:node tooling/eslint/package.json tooling/eslint/package.json
 COPY --chown=node:node tooling/integration-tests/package.json tooling/integration-tests/package.json

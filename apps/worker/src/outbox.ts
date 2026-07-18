@@ -8,9 +8,15 @@ interface ClaimedEvent {
   id: string;
   workspaceId: string | null;
   payload: {
-    template: 'workspace-invitation' | 'project-invitation' | 'magic-link' | 'domain-event';
+    template:
+      | 'workspace-invitation'
+      | 'project-invitation'
+      | 'magic-link'
+      | 'material-request'
+      | 'domain-event';
     recipientUserId?: string;
     invitationId?: string;
+    projectId?: string;
   };
   encryptedSecret: string | null;
   attempts: number;
@@ -61,7 +67,7 @@ async function claim(pool: Pool): Promise<ClaimedEvent | null> {
   }
 }
 
-async function resolveRecipient(connection: PoolClient, event: ClaimedEvent) {
+async function resolveRecipient(connection: PoolClient, event: ClaimedEvent, publicAppUrl: string) {
   if (
     (event.payload.template === 'workspace-invitation' ||
       event.payload.template === 'project-invitation') &&
@@ -110,6 +116,36 @@ async function resolveRecipient(connection: PoolClient, event: ClaimedEvent) {
         }
       : null;
   }
+  if (
+    event.payload.template === 'material-request' &&
+    event.payload.recipientUserId &&
+    event.payload.projectId &&
+    event.workspaceId
+  ) {
+    const result = await connection.query<{
+      email: string;
+      projectName: string;
+      workspaceSlug: string;
+      projectSlug: string;
+    }>(
+      `select u.email, p.name as "projectName", w.slug as "workspaceSlug", p.slug as "projectSlug"
+       from "user" u
+       join workspace_membership wm on wm.user_id = u.id and wm.workspace_id = $3
+       join workspace w on w.id = wm.workspace_id
+       join project p on p.id = $2 and p.workspace_id = wm.workspace_id
+       where u.id = $1 and u.status = 'active' and wm.status = 'active'`,
+      [event.payload.recipientUserId, event.payload.projectId, event.workspaceId],
+    );
+    const row = result.rows[0];
+    return row
+      ? {
+          email: row.email,
+          subject: `Нужны материалы для проекта «${row.projectName}»`,
+          text: `В Garun Workspace появился новый запрос материалов для проекта «${row.projectName}». Откройте проект: `,
+          directUrl: `${publicAppUrl}/workspace/${encodeURIComponent(row.workspaceSlug)}/projects/${encodeURIComponent(row.projectSlug)}/materials`,
+        }
+      : null;
+  }
   return null;
 }
 
@@ -138,12 +174,15 @@ export function startOutboxDispatcher(
       const connection = await pool.connect();
       try {
         if (event.payload.template !== 'domain-event') {
-          const recipient = await resolveRecipient(connection, event);
-          if (!recipient || !event.encryptedSecret) throw new Error('RECIPIENT_NOT_FOUND');
-          const link = decryptOutboxSecret(
-            event.encryptedSecret,
-            environment.OUTBOX_ENCRYPTION_KEY,
-          );
+          const recipient = await resolveRecipient(connection, event, environment.PUBLIC_APP_URL);
+          if (!recipient) throw new Error('RECIPIENT_NOT_FOUND');
+          const link =
+            'directUrl' in recipient && recipient.directUrl
+              ? recipient.directUrl
+              : event.encryptedSecret
+                ? decryptOutboxSecret(event.encryptedSecret, environment.OUTBOX_ENCRYPTION_KEY)
+                : null;
+          if (!link) throw new Error('DELIVERY_LINK_NOT_FOUND');
           await transport.sendMail({
             from: environment.EMAIL_FROM,
             to: recipient.email,

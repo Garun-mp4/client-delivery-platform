@@ -1,8 +1,12 @@
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
+
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 
 import type { DatabaseClient } from '@garun/db';
 import {
   auditEvent,
+  fileLink,
+  fileObject,
   outboxEvent,
   projectMembership,
   questionnaire,
@@ -10,7 +14,9 @@ import {
   questionnaireDraft,
   questionnaireSubmission,
   workspaceMembership,
+  workspace,
 } from '@garun/db/schema';
+import { normalizeDisplayName } from '@garun/storage';
 
 import type { TenantContext } from '../identity/tenant';
 import { canAccessProject, resolveProjectAccess } from '../projects/policies';
@@ -83,7 +89,7 @@ export async function createQuestionnaire(
 ) {
   const access = await requireProjectAccess(client, tenant, projectSlug, 'project.edit');
   if (access.projectStatus === 'archived') throw new QuestionnaireServiceError('INVALID_STATE');
-  const schema = parseQuestionnaireSchema(input.schema);
+  const schema = parseQuestionnaireSchema(input.schema, { allowFileFields: true });
   return client.db.transaction(async (tx) => {
     const [assignee] = await tx
       .select({ id: projectMembership.id })
@@ -142,6 +148,114 @@ export async function createQuestionnaire(
         domainEvent(tenant.workspaceId, access.projectId, 'questionnaire.created', created.id),
       );
     return created;
+  });
+}
+
+export async function initiateQuestionnaireFileUpload(
+  client: DatabaseClient,
+  tenant: TenantContext,
+  projectSlug: string,
+  questionnaireId: string,
+  fieldId: string,
+  input: {
+    readonly name: string;
+    readonly mimeType: string;
+    readonly size: number;
+    readonly checksum: string;
+    readonly idempotencyKey: string;
+    readonly maxWorkspaceBytes: number;
+    readonly uploadExpiresAt: Date;
+  },
+) {
+  const access = await requireProjectAccess(client, tenant, projectSlug, 'project.view');
+  if (
+    access.side !== 'client' ||
+    access.role !== 'client' ||
+    access.projectStatus === 'archived' ||
+    !/^[a-zA-Z0-9_-]{16,100}$/.test(input.idempotencyKey)
+  ) {
+    throw new QuestionnaireServiceError('NOT_FOUND');
+  }
+  return client.db.transaction(async (tx) => {
+    const item = await lockedQuestionnaire(tx, tenant, access.projectId, questionnaireId);
+    if (item.assignedToUserId !== tenant.userId || item.status !== 'open') {
+      throw new QuestionnaireServiceError('NOT_FOUND');
+    }
+    const field = item.schema.sections
+      .flatMap((section) => section.fields)
+      .find((candidate) => candidate.id === fieldId);
+    if (!field || (field.type !== 'file' && field.type !== 'image')) {
+      throw new QuestionnaireServiceError('NOT_FOUND');
+    }
+    const [existing] = await tx
+      .select({
+        id: fileObject.id,
+        storageKey: fileObject.storageKey,
+        name: fileObject.normalizedName,
+        mimeType: fileObject.declaredMimeType,
+        size: fileObject.size,
+        checksum: fileObject.clientChecksum,
+      })
+      .from(fileObject)
+      .where(
+        and(
+          eq(fileObject.workspaceId, tenant.workspaceId),
+          eq(fileObject.uploadedByUserId, tenant.userId),
+          eq(fileObject.uploadSessionKey, input.idempotencyKey),
+        ),
+      )
+      .limit(1);
+    if (existing) return existing;
+    await tx
+      .select({ id: workspace.id })
+      .from(workspace)
+      .where(eq(workspace.id, tenant.workspaceId))
+      .for('update');
+    const [usage] = await tx
+      .select({ bytes: sql<number>`coalesce(sum(${fileObject.size}), 0)::bigint` })
+      .from(fileObject)
+      .where(
+        and(
+          eq(fileObject.workspaceId, tenant.workspaceId),
+          inArray(fileObject.uploadStatus, ['initiated', 'uploaded', 'scanning', 'available']),
+        ),
+      );
+    if (Number(usage?.bytes ?? 0) + input.size > input.maxWorkspaceBytes) {
+      throw new QuestionnaireServiceError('VALIDATION_FAILED');
+    }
+    const id = randomUUID();
+    const storageKey = `${tenant.workspaceId}/${access.projectId}/${id}/original`;
+    const normalizedName = normalizeDisplayName(input.name);
+    await tx.insert(fileObject).values({
+      id,
+      workspaceId: tenant.workspaceId,
+      projectId: access.projectId,
+      storageKey,
+      originalName: normalizedName,
+      normalizedName,
+      declaredMimeType: input.mimeType,
+      size: input.size,
+      clientChecksum: input.checksum,
+      uploadSessionKey: input.idempotencyKey,
+      uploadedByUserId: tenant.userId,
+      uploadExpiresAt: input.uploadExpiresAt,
+    });
+    await tx.insert(fileLink).values({
+      workspaceId: tenant.workspaceId,
+      projectId: access.projectId,
+      fileObjectId: id,
+      questionnaireId,
+      questionnaireFieldId: fieldId,
+      version: 1,
+    });
+    return {
+      id,
+      storageKey,
+      name: normalizedName,
+      mimeType: input.mimeType,
+      size: input.size,
+      checksum: input.checksum,
+    };
   });
 }
 
@@ -289,6 +403,34 @@ export async function submitQuestionnaire(
     });
     if (Object.keys(validation.errors).length > 0) {
       throw new QuestionnaireServiceError('VALIDATION_FAILED', validation.errors);
+    }
+    const fileFields = item.schema.sections
+      .flatMap((section) => section.fields)
+      .filter((field) => field.type === 'file' || field.type === 'image');
+    for (const field of fileFields) {
+      const value = validation.answers[field.id];
+      if (typeof value !== 'string') continue;
+      const [available] = await tx
+        .select({ id: fileObject.id, mimeType: fileObject.detectedMimeType })
+        .from(fileLink)
+        .innerJoin(fileObject, eq(fileObject.id, fileLink.fileObjectId))
+        .where(
+          and(
+            eq(fileLink.questionnaireId, item.id),
+            eq(fileLink.questionnaireFieldId, field.id),
+            eq(fileLink.workspaceId, tenant.workspaceId),
+            eq(fileObject.id, value),
+            eq(fileObject.uploadedByUserId, tenant.userId),
+            eq(fileObject.uploadStatus, 'available'),
+            eq(fileObject.scanStatus, 'clean'),
+          ),
+        )
+        .limit(1);
+      if (!available || (field.type === 'image' && !available.mimeType?.startsWith('image/'))) {
+        throw new QuestionnaireServiceError('VALIDATION_FAILED', {
+          [field.id]: 'Дождитесь завершения проверки файла.',
+        });
+      }
     }
     const [latest] = await tx
       .select({ revision: questionnaireSubmission.revision })

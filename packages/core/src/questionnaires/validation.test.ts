@@ -70,7 +70,7 @@ describe('questionnaire schema and answers', () => {
     expect(result.progressPercent).toBe(33);
   });
 
-  it('rejects forward conditions, duplicate ids and file fields before milestone 06', () => {
+  it('rejects forward conditions and accepts file fields in milestone 06', () => {
     expect(() =>
       parseQuestionnaireSchema({
         version: 1,

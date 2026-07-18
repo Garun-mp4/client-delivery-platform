@@ -32,12 +32,17 @@ function FieldInput({
   value,
   error,
   onChange,
+  fileUploadBaseUrl,
+  completeBaseUrl,
 }: {
   field: QuestionnaireField;
   value: unknown;
   error?: string;
   onChange: (value: unknown) => void;
+  fileUploadBaseUrl: string;
+  completeBaseUrl: string;
 }) {
+  const [fileStatus, setFileStatus] = useState<'idle' | 'uploading' | 'pending' | 'error'>('idle');
   const describedBy = [field.hint ? `${field.id}-hint` : '', error ? `${field.id}-error` : '']
     .filter(Boolean)
     .join(' ');
@@ -76,6 +81,8 @@ function FieldInput({
                     ),
                   )
                 }
+                fileUploadBaseUrl={fileUploadBaseUrl}
+                completeBaseUrl={completeBaseUrl}
               />
             ))}
             <button
@@ -167,7 +174,76 @@ function FieldInput({
       </label>
     );
   } else if (field.type === 'file' || field.type === 'image') {
-    control = <p className="notice">Это поле станет доступно после подключения файлов.</p>;
+    control = (
+      <div>
+        <input
+          {...common}
+          type="file"
+          accept={
+            field.type === 'image'
+              ? '.jpg,.jpeg,.png,.webp,.gif'
+              : '.jpg,.jpeg,.png,.webp,.gif,.pdf,.mp4,.txt,.csv'
+          }
+          onChange={async (event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            setFileStatus('uploading');
+            try {
+              const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+              const checksum = [...new Uint8Array(digest)]
+                .map((byte) => byte.toString(16).padStart(2, '0'))
+                .join('');
+              const response = await fetch(`${fileUploadBaseUrl}/${field.id}/upload`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({
+                  idempotencyKey: crypto.randomUUID().replaceAll('-', ''),
+                  file: {
+                    name: file.name,
+                    mimeType: file.type,
+                    size: file.size,
+                    checksum,
+                  },
+                }),
+              });
+              if (!response.ok) throw new Error('UPLOAD_INIT_FAILED');
+              const upload = (await response.json()) as { id: string; url: string };
+              await new Promise<void>((resolve, reject) => {
+                const request = new XMLHttpRequest();
+                request.open('PUT', upload.url);
+                request.setRequestHeader('content-type', file.type);
+                request.setRequestHeader('x-amz-meta-client-sha256', checksum);
+                request.onload = () =>
+                  request.status >= 200 && request.status < 300
+                    ? resolve()
+                    : reject(new Error('UPLOAD_FAILED'));
+                request.onerror = () => reject(new Error('UPLOAD_FAILED'));
+                request.send(file);
+              });
+              const completed = await fetch(`${completeBaseUrl}/${upload.id}/complete`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: '{}',
+              });
+              if (!completed.ok) throw new Error('UPLOAD_COMPLETE_FAILED');
+              onChange(upload.id);
+              setFileStatus('pending');
+            } catch {
+              setFileStatus('error');
+            }
+          }}
+        />
+        {typeof value === 'string' || fileStatus === 'pending' ? (
+          <p className="field-hint">Файл загружен и проверяется.</p>
+        ) : null}
+        {fileStatus === 'uploading' ? <p className="field-hint">Загружаем файл…</p> : null}
+        {fileStatus === 'error' ? (
+          <p className="field-error" role="alert">
+            Не удалось загрузить файл. Проверьте тип и размер и повторите.
+          </p>
+        ) : null}
+      </div>
+    );
   } else {
     const inputType = {
       short_text: 'text',
@@ -222,6 +298,8 @@ export function QuestionnaireForm({
   initialProgress,
   draftUrl,
   submitUrl,
+  fileUploadBaseUrl,
+  completeBaseUrl,
 }: {
   schema: QuestionnaireSchema;
   initialAnswers: Record<string, unknown>;
@@ -230,6 +308,8 @@ export function QuestionnaireForm({
   initialProgress: { completedFields: number; totalFields: number; progressPercent: number };
   draftUrl: string;
   submitUrl: string;
+  fileUploadBaseUrl: string;
+  completeBaseUrl: string;
 }) {
   const [answers, setAnswers] = useState<Record<string, unknown>>(initialAnswers);
   const [status, setStatus] = useState<SaveStatus>('saved');
@@ -382,6 +462,8 @@ export function QuestionnaireForm({
                 value={answers[field.id]}
                 error={errors[field.id]}
                 onChange={(value) => change(field.id, value)}
+                fileUploadBaseUrl={fileUploadBaseUrl}
+                completeBaseUrl={completeBaseUrl}
               />
             ) : null,
           )}

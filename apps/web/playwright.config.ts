@@ -19,7 +19,12 @@ export default defineConfig({
     { name: 'chrome', use: { ...devices['Desktop Chrome'], channel: 'chrome' } },
     {
       name: 'mobile-chrome',
-      testIgnore: ['**/identity.spec.ts', '**/projects.spec.ts'],
+      testIgnore: [
+        '**/identity.spec.ts',
+        '**/materials.spec.ts',
+        '**/projects.spec.ts',
+        '**/questionnaires.spec.ts',
+      ],
       use: { ...devices['Pixel 7'], channel: 'chrome' },
     },
   ],

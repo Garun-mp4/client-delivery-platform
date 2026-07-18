@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./identity": "./src/identity/index.ts",
+    "./materials": "./src/materials/index.ts",
     "./projects": "./src/projects/index.ts",
     "./questionnaires": "./src/questionnaires/index.ts",
     "./workflow": "./src/workflow/index.ts"
@@ -17,6 +18,7 @@
   },
   "dependencies": {
     "@garun/db": "workspace:*",
+    "@garun/storage": "workspace:*",
     "drizzle-orm": "catalog:"
   },
   "devDependencies": {

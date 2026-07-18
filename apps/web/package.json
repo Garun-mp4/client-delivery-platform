@@ -19,6 +19,7 @@
     "@garun/contracts": "workspace:*",
     "@garun/db": "workspace:*",
     "@garun/observability": "workspace:*",
+    "@garun/storage": "workspace:*",
     "@garun/ui": "workspace:*",
     "better-auth": "catalog:",
     "drizzle-orm": "catalog:",

@@ -46,6 +46,7 @@ function SubmissionAnswers({
   comments,
   commentAction,
   canComment,
+  fileBaseUrl,
 }: {
   fields: readonly QuestionnaireField[];
   answers: Record<string, unknown>;
@@ -58,6 +59,7 @@ function SubmissionAnswers({
   }[];
   commentAction: string;
   canComment: boolean;
+  fileBaseUrl: string;
 }) {
   return (
     <div className="answer-list">
@@ -66,7 +68,13 @@ function SubmissionAnswers({
         .map((field) => (
           <article className="answer-card" id={`answer-${field.id}`} key={field.id}>
             <h3>{field.label}</h3>
-            <p className="answer-value">{displayValue(answers[field.id])}</p>
+            {['file', 'image'].includes(field.type) && typeof answers[field.id] === 'string' ? (
+              <p className="answer-value">
+                <Link href={`${fileBaseUrl}/${answers[field.id]}`}>Скачать отправленный файл</Link>
+              </p>
+            ) : (
+              <p className="answer-value">{displayValue(answers[field.id])}</p>
+            )}
             {comments
               .filter((comment) => comment.fieldId === field.id)
               .map((comment) => (
@@ -158,6 +166,8 @@ export default async function QuestionnairePage({
             initialProgress={result.draft.progress}
             draftUrl={`/api/workspaces/${slug}/projects/${projectSlug}/questionnaires/${item.id}/draft`}
             submitUrl={`/api/workspaces/${slug}/projects/${projectSlug}/questionnaires/${item.id}/submit`}
+            fileUploadBaseUrl={`/api/workspaces/${slug}/projects/${projectSlug}/questionnaires/${item.id}/fields`}
+            completeBaseUrl={`/api/workspaces/${slug}/projects/${projectSlug}/files`}
           />
         </>
       ) : !internal && item.status === 'submitted' ? (
@@ -200,6 +210,7 @@ export default async function QuestionnairePage({
               comments={comments}
               canComment={canComment}
               commentAction={`/api/workspaces/${slug}/projects/${projectSlug}/questionnaires/${item.id}/submissions/${submission.id}/comments`}
+              fileBaseUrl={`/api/workspaces/${slug}/projects/${projectSlug}/files`}
             />
             {internal && canReview && submission.status === 'submitted' ? (
               <div className="review-actions">

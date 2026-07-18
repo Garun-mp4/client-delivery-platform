@@ -114,6 +114,56 @@ export const questionnaireSubmissionStatus = pgEnum('questionnaire_submission_st
   'clarification_requested',
   'accepted',
 ]);
+export const materialType = pgEnum('material_type', [
+  'text',
+  'contact',
+  'link',
+  'file',
+  'image',
+  'video',
+  'logo',
+  'document',
+  'details',
+  'service',
+  'testimonial',
+  'employee',
+  'legal_text',
+  'other',
+]);
+export const materialStatus = pgEnum('material_status', [
+  'requested',
+  'uploaded',
+  'clarification',
+  'accepted',
+  'replaced',
+  'not_required',
+]);
+export const materialRevisionStatus = pgEnum('material_revision_status', [
+  'uploading',
+  'pending_scan',
+  'submitted',
+  'clarification_requested',
+  'accepted',
+  'replaced',
+  'rejected',
+]);
+export const fileUploadStatus = pgEnum('file_upload_status', [
+  'initiated',
+  'uploaded',
+  'scanning',
+  'available',
+  'rejected',
+  'failed',
+  'deleted',
+]);
+export const fileScanStatus = pgEnum('file_scan_status', [
+  'pending',
+  'scanning',
+  'clean',
+  'infected',
+  'error',
+]);
+export const fileVisibility = pgEnum('file_visibility', ['project', 'internal']);
 
 // Better Auth core model. Application code always writes a normalized lowercase email.
 export const user = pgTable(
@@ -900,6 +950,234 @@ export const questionnaireAnswerComment = pgTable(
   ],
 );
 
+export const material = pgTable(
+  'material',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    stageId: uuid('stage_id'),
+    actionItemId: uuid('action_item_id'),
+    type: materialType('type').notNull(),
+    title: text('title').notNull(),
+    category: text('category'),
+    status: materialStatus('status').notNull().default('requested'),
+    currentRevisionId: uuid('current_revision_id'),
+    requestedFromUserId: uuid('requested_from_user_id').notNull(),
+    requestedByUserId: uuid('requested_by_user_id').notNull(),
+    dueAt: timestamp('due_at', { withTimezone: true, mode: 'date' }),
+    finalAt: timestamp('final_at', { withTimezone: true, mode: 'date' }),
+    notRequiredReason: text('not_required_reason'),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [project.id, project.workspaceId],
+      name: 'material_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.stageId, table.projectId, table.workspaceId],
+      foreignColumns: [projectStage.id, projectStage.projectId, projectStage.workspaceId],
+      name: 'material_stage_project_workspace_fk',
+    }).onDelete('restrict'),
+    foreignKey({
+      columns: [table.workspaceId, table.requestedFromUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'material_requested_from_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.requestedByUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'material_requested_by_workspace_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('material_id_project_workspace_unique').on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
+    index('material_project_status_category_idx').on(table.projectId, table.status, table.category),
+    index('material_requested_from_status_idx').on(
+      table.workspaceId,
+      table.requestedFromUserId,
+      table.status,
+    ),
+    check(
+      'material_not_required_reason_check',
+      sql`${table.status} <> 'not_required' OR nullif(btrim(${table.notRequiredReason}), '') IS NOT NULL`,
+    ),
+  ],
+);
+
+export interface MaterialRevisionContent {
+  readonly text?: string;
+  readonly url?: string;
+}
+
+export const materialRevision = pgTable(
+  'material_revision',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    materialId: uuid('material_id').notNull(),
+    revision: integer('revision').notNull(),
+    status: materialRevisionStatus('status').notNull(),
+    content: jsonb('content').$type<MaterialRevisionContent>().notNull().default({}),
+    idempotencyKey: text('idempotency_key').notNull(),
+    expectedFileCount: integer('expected_file_count').notNull().default(0),
+    submittedByUserId: uuid('submitted_by_user_id').notNull(),
+    submittedAt: timestamp('submitted_at', { withTimezone: true, mode: 'date' }),
+    acceptedByUserId: uuid('accepted_by_user_id'),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true, mode: 'date' }),
+    reviewComment: text('review_comment'),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.materialId, table.projectId, table.workspaceId],
+      foreignColumns: [material.id, material.projectId, material.workspaceId],
+      name: 'material_revision_material_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.submittedByUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'material_revision_submitter_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.acceptedByUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'material_revision_acceptor_workspace_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('material_revision_material_revision_unique').on(table.materialId, table.revision),
+    uniqueIndex('material_revision_material_idempotency_unique').on(
+      table.materialId,
+      table.idempotencyKey,
+    ),
+    uniqueIndex('material_revision_id_project_workspace_unique').on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
+    index('material_revision_material_status_idx').on(table.materialId, table.status),
+    check('material_revision_positive_revision_check', sql`${table.revision} > 0`),
+    check('material_revision_file_count_check', sql`${table.expectedFileCount} >= 0`),
+  ],
+);
+
+export const fileObject = pgTable(
+  'file_object',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    storageKey: text('storage_key').notNull(),
+    previewStorageKey: text('preview_storage_key'),
+    originalName: text('original_name').notNull(),
+    normalizedName: text('normalized_name').notNull(),
+    declaredMimeType: text('declared_mime_type').notNull(),
+    detectedMimeType: text('detected_mime_type'),
+    size: bigint('size', { mode: 'number' }).notNull(),
+    clientChecksum: text('client_checksum').notNull(),
+    uploadSessionKey: text('upload_session_key').notNull(),
+    checksum: text('checksum'),
+    uploadStatus: fileUploadStatus('upload_status').notNull().default('initiated'),
+    scanStatus: fileScanStatus('scan_status').notNull().default('pending'),
+    scannerEngine: text('scanner_engine'),
+    scanResultCode: text('scan_result_code'),
+    scanStartedAt: timestamp('scan_started_at', { withTimezone: true, mode: 'date' }),
+    processingAttempts: integer('processing_attempts').notNull().default(0),
+    nextProcessingAt: timestamp('next_processing_at', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    scannedAt: timestamp('scanned_at', { withTimezone: true, mode: 'date' }),
+    uploadedByUserId: uuid('uploaded_by_user_id').notNull(),
+    uploadExpiresAt: timestamp('upload_expires_at', { withTimezone: true, mode: 'date' }).notNull(),
+    uploadedAt: timestamp('uploaded_at', { withTimezone: true, mode: 'date' }),
+    availableAt: timestamp('available_at', { withTimezone: true, mode: 'date' }),
+    deletedAt: timestamp('deleted_at', { withTimezone: true, mode: 'date' }),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [project.id, project.workspaceId],
+      name: 'file_object_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.uploadedByUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'file_object_uploader_workspace_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('file_object_storage_key_unique').on(table.storageKey),
+    uniqueIndex('file_object_workspace_uploader_session_unique').on(
+      table.workspaceId,
+      table.uploadedByUserId,
+      table.uploadSessionKey,
+    ),
+    uniqueIndex('file_object_id_project_workspace_unique').on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
+    index('file_object_scan_queue_idx').on(table.uploadStatus, table.scanStatus, table.createdAt),
+    index('file_object_workspace_quota_idx').on(table.workspaceId, table.uploadStatus),
+    index('file_object_upload_expiry_idx').on(table.uploadStatus, table.uploadExpiresAt),
+    check('file_object_positive_size_check', sql`${table.size} > 0`),
+  ],
+);
+
+export const fileLink = pgTable(
+  'file_link',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    fileObjectId: uuid('file_object_id').notNull(),
+    materialRevisionId: uuid('material_revision_id'),
+    questionnaireId: uuid('questionnaire_id'),
+    questionnaireFieldId: text('questionnaire_field_id'),
+    label: text('label'),
+    visibility: fileVisibility('visibility').notNull().default('project'),
+    version: integer('version').notNull(),
+    isCurrent: boolean('is_current').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.fileObjectId, table.projectId, table.workspaceId],
+      foreignColumns: [fileObject.id, fileObject.projectId, fileObject.workspaceId],
+      name: 'file_link_object_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.questionnaireId, table.projectId, table.workspaceId],
+      foreignColumns: [questionnaire.id, questionnaire.projectId, questionnaire.workspaceId],
+      name: 'file_link_questionnaire_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.materialRevisionId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        materialRevision.id,
+        materialRevision.projectId,
+        materialRevision.workspaceId,
+      ],
+      name: 'file_link_revision_project_workspace_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('file_link_revision_object_unique')
+      .on(table.materialRevisionId, table.fileObjectId)
+      .where(sql`${table.materialRevisionId} IS NOT NULL`),
+    uniqueIndex('file_link_questionnaire_field_object_unique')
+      .on(table.questionnaireId, table.questionnaireFieldId, table.fileObjectId)
+      .where(sql`${table.questionnaireId} IS NOT NULL`),
+    index('file_link_revision_current_idx').on(table.materialRevisionId, table.isCurrent),
+    check('file_link_positive_version_check', sql`${table.version} > 0`),
+    check(
+      'file_link_single_context_check',
+      sql`(${table.materialRevisionId} IS NOT NULL AND ${table.questionnaireId} IS NULL AND ${table.questionnaireFieldId} IS NULL) OR (${table.materialRevisionId} IS NULL AND ${table.questionnaireId} IS NOT NULL AND nullif(btrim(${table.questionnaireFieldId}), '') IS NOT NULL)`,
+    ),
+  ],
+);
+
 export const clientInvitationContext = pgTable(
   'client_invitation_context',
   {
@@ -986,7 +1264,12 @@ export const auditEvent = pgTable(
 );
 
 export interface OutboxPayload {
-  readonly template: 'workspace-invitation' | 'project-invitation' | 'magic-link' | 'domain-event';
+  readonly template:
+    | 'workspace-invitation'
+    | 'project-invitation'
+    | 'magic-link'
+    | 'material-request'
+    | 'domain-event';
   readonly recipientUserId?: string;
   readonly invitationId?: string;
   readonly projectId?: string;

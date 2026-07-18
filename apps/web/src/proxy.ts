@@ -4,10 +4,16 @@ import { getOrCreateRequestId } from '@garun/observability';
 
 function createContentSecurityPolicy(nonce: string): string {
   const isDevelopment = process.env.NODE_ENV === 'development';
+  const publicProtocol = process.env.PUBLIC_APP_URL
+    ? new URL(process.env.PUBLIC_APP_URL).protocol
+    : 'http:';
+  const storageOrigin = process.env.STORAGE_PUBLIC_ENDPOINT
+    ? new URL(process.env.STORAGE_PUBLIC_ENDPOINT).origin
+    : null;
   const directives = [
     "default-src 'self'",
     "base-uri 'self'",
-    `connect-src 'self'${isDevelopment ? ' ws: wss:' : ''}`,
+    `connect-src 'self'${storageOrigin ? ` ${storageOrigin}` : ''}${isDevelopment ? ' ws: wss:' : ''}`,
     "font-src 'self' data:",
     "form-action 'self'",
     "frame-ancestors 'none'",
@@ -15,7 +21,7 @@ function createContentSecurityPolicy(nonce: string): string {
     "object-src 'none'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDevelopment ? " 'unsafe-eval'" : ''}`,
     `style-src 'self'${isDevelopment ? " 'unsafe-inline'" : ` 'nonce-${nonce}'`}`,
-    ...(isDevelopment ? [] : ['upgrade-insecure-requests']),
+    ...(!isDevelopment && publicProtocol === 'https:' ? ['upgrade-insecure-requests'] : []),
   ];
 
   return directives.join('; ');

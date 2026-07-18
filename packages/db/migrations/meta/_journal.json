@@ -57,6 +57,34 @@
       "when": 1784287467958,
       "tag": "0007_sour_gwen_stacy",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784367557003,
+      "tag": "0008_bent_sauron",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784369410439,
+      "tag": "0009_moaning_vector",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784372795878,
+      "tag": "0010_silly_millenium_guard",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784373738045,
+      "tag": "0011_material-membership-cascade-upgrade",
+      "breakpoints": true
     }
   ]
 }

@@ -85,6 +85,11 @@ test('client resumes autosaved questionnaire and sends a clarified immutable rev
   await secondField.getByLabel('Тип').selectOption('long_text');
   await secondField.getByLabel('Вопрос или текст блока').fill('Главная цель сайта');
   await secondField.getByLabel('Обязательный ответ').check();
+  await page.getByRole('button', { name: 'Добавить поле' }).click();
+  const thirdField = page.locator('.builder-field').nth(2);
+  await thirdField.getByLabel('Тип').selectOption('file');
+  await thirdField.getByLabel('Вопрос или текст блока').fill('Бриф-файл');
+  await thirdField.getByLabel('Обязательный ответ').check();
   await page.getByRole('button', { name: 'Создать и отправить анкету' }).click();
   await expect(page.getByRole('heading', { name: questionnaireTitle })).toBeVisible();
 
@@ -97,6 +102,30 @@ test('client resumes autosaved questionnaire and sends a clarified immutable rev
   await clientPage.reload();
   await expect(clientPage.getByLabel('Название компании *')).toHaveValue('Гарун');
   await clientPage.getByLabel('Главная цель сайта *').fill('Получать заявки');
+  const fileCompletion = clientPage.waitForResponse(
+    (response) => response.request().method() === 'POST' && response.url().endsWith('/complete'),
+  );
+  await clientPage.getByLabel('Бриф-файл *').setInputFiles({
+    name: `brief-${suffix}.txt`,
+    mimeType: 'text/plain',
+    buffer: Buffer.from('Материал анкеты для проверки безопасной загрузки.'),
+  });
+  const completionResponse = await fileCompletion;
+  expect(completionResponse.ok()).toBe(true);
+  const completedFileId = new URL(completionResponse.url()).pathname.split('/').at(-2);
+  if (!completedFileId) throw new Error('Questionnaire file id not found');
+  await expect
+    .poll(
+      async () =>
+        (
+          await clientPage.request.get(
+            `/api/workspaces/e2e-studio/projects/${projectSlug}/files/${completedFileId}`,
+            { maxRedirects: 0 },
+          )
+        ).status(),
+      { timeout: 40_000 },
+    )
+    .toBe(302);
   await expect(clientPage.locator('.autosave-status')).toContainText('Сохранено', {
     timeout: 10_000,
   });
@@ -108,6 +137,7 @@ test('client resumes autosaved questionnaire and sends a clarified immutable rev
 
   await page.reload();
   await expect(page.getByText('Получать заявки')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Скачать отправленный файл' })).toBeVisible();
   await page.getByLabel('Что нужно уточнить').fill('Укажите измеримую цель.');
   await page.getByRole('button', { name: 'Вернуть на уточнение' }).click();
   await expect(page.getByText('Операция выполнена.')).toBeVisible();

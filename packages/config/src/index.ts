@@ -61,6 +61,35 @@ const emailShape = {
     .transform((value) => value === 'true'),
 } as const;
 
+const storageShape = {
+  STORAGE_ENDPOINT: z.url().default('http://127.0.0.1:9000'),
+  STORAGE_PUBLIC_ENDPOINT: z.url().default('http://127.0.0.1:9000'),
+  STORAGE_REGION: z.string().trim().min(1).default('us-east-1'),
+  STORAGE_BUCKET: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9][a-z0-9.-]{2,62}$/)
+    .default('garun-private'),
+  STORAGE_ACCESS_KEY: z.string().min(3).default('garun_local'),
+  STORAGE_SECRET_KEY: z.string().min(8).default('local_only_change_me'),
+  STORAGE_FORCE_PATH_STYLE: z
+    .string()
+    .default('true')
+    .transform((value) => value === 'true'),
+  STORAGE_UPLOAD_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
+  STORAGE_DOWNLOAD_TTL_SECONDS: z.coerce.number().int().min(30).max(300).default(60),
+  INCOMPLETE_UPLOAD_RETENTION_HOURS: z.coerce.number().int().min(1).max(168).default(24),
+} as const;
+
+const scannerShape = {
+  SCANNER_HOST: z.string().trim().min(1).default('127.0.0.1'),
+  SCANNER_PORT: z.coerce.number().int().min(1).max(65_535).default(3310),
+  SCANNER_REQUIRED: z
+    .string()
+    .default('true')
+    .transform((value) => value === 'true'),
+} as const;
+
 function validateProductConfig(
   value: z.output<z.ZodObject<typeof sharedServerShape>>,
   context: z.RefinementCtx,
@@ -105,10 +134,23 @@ function validateIdentityConfig(
 }
 
 const webSchema = z
-  .object({ ...sharedServerShape, ...databaseShape, ...redisShape, ...identityShape })
+  .object({
+    ...sharedServerShape,
+    ...databaseShape,
+    ...redisShape,
+    ...identityShape,
+    ...storageShape,
+  })
   .superRefine((value, context) => {
     validateProductConfig(value, context);
     validateIdentityConfig(value, context);
+    if (value.APP_ENV === 'production' && !value.STORAGE_PUBLIC_ENDPOINT.startsWith('https://')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'STORAGE_PUBLIC_ENDPOINT must use HTTPS in production',
+        path: ['STORAGE_PUBLIC_ENDPOINT'],
+      });
+    }
   });
 
 const workerSchema = z
@@ -118,12 +160,21 @@ const workerSchema = z
     ...redisShape,
     ...identityShape,
     ...emailShape,
+    ...storageShape,
+    ...scannerShape,
     WORKER_HOST: z.string().trim().min(1).default('127.0.0.1'),
     WORKER_PORT: z.coerce.number().int().min(1).max(65_535).default(3001),
   })
   .superRefine((value, context) => {
     validateProductConfig(value, context);
     validateIdentityConfig(value, context);
+    if (value.APP_ENV === 'production' && !value.SCANNER_REQUIRED) {
+      context.addIssue({
+        code: 'custom',
+        message: 'SCANNER_REQUIRED must be true in production',
+        path: ['SCANNER_REQUIRED'],
+      });
+    }
     if (value.APP_ENV === 'production' && value.EMAIL_FROM.endsWith('.invalid>')) {
       context.addIssue({
         code: 'custom',
