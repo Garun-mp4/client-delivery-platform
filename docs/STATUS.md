@@ -41,8 +41,7 @@ UX-ветка ещё не была объединена в `main`. При соз
 
 ## Текущие задачи
 
-- Подготовить коммиты и отправить `feat/milestone-07-review-loop`.
-- Дождаться итогового GitHub Actions run.
+- Создать Pull Request `feat/milestone-07-review-loop` после PR/merge Milestone 06.5.
 - Milestone 08 не начинать до merge и отдельного подтверждения.
 
 ## Найденные проблемы
@@ -90,6 +89,8 @@ UX-ветка ещё не была объединена в `main`. При соз
 - `docker compose up -d --build --wait` — migration/storage-init exited 0; web, worker, PostgreSQL,
   Redis, MinIO, Mailpit и ClamAV healthy.
 - `pnpm smoke` — web/worker passed; `pnpm audit --prod` — известных уязвимостей нет.
+- GitHub Actions run `29655680474` для commit `5eb60ef` — успешно; install, audit, format, lint,
+  typecheck, migration drift/apply, unit, integration, build, artifact, browser/a11y и smoke зелёные.
 - `git diff --check`, tracked env/artifact scan, high-confidence secret scan, type-suppression scan и
   Compose error/secret log scan — успешно.
 
