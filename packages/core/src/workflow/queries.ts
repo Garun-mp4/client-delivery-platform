@@ -3,13 +3,14 @@ import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
 import type { DatabaseClient } from '@garun/db';
 import {
   actionItem,
+  approvalRequest,
+  approvalRequestApprover,
   clientMembership,
   project,
   projectMembership,
   projectScopeRevision,
   projectStage,
   projectUpdate,
-  scopeRevisionApprover,
   siteVersion,
   user,
 } from '@garun/db/schema';
@@ -166,13 +167,15 @@ export async function isAssignedScopeApprover(
   revisionId: string,
 ) {
   const [row] = await database
-    .select({ id: scopeRevisionApprover.id })
-    .from(scopeRevisionApprover)
+    .select({ id: approvalRequestApprover.id })
+    .from(approvalRequestApprover)
+    .innerJoin(approvalRequest, eq(approvalRequest.id, approvalRequestApprover.approvalRequestId))
     .where(
       and(
-        eq(scopeRevisionApprover.workspaceId, tenant.workspaceId),
-        eq(scopeRevisionApprover.scopeRevisionId, revisionId),
-        eq(scopeRevisionApprover.userId, tenant.userId),
+        eq(approvalRequestApprover.workspaceId, tenant.workspaceId),
+        eq(approvalRequest.scopeRevisionId, revisionId),
+        eq(approvalRequest.status, 'pending'),
+        eq(approvalRequestApprover.userId, tenant.userId),
       ),
     )
     .limit(1);

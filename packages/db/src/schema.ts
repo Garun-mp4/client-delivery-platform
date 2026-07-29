@@ -71,6 +71,25 @@ export const scopeRevisionStatus = pgEnum('scope_revision_status', [
   'superseded',
 ]);
 export const scopeDecisionType = pgEnum('scope_decision_type', ['agreed', 'changes_requested']);
+export const approvalEntityType = pgEnum('approval_entity_type', [
+  'scope_revision',
+  'project_stage',
+  'site_version',
+  'file_object',
+  'final_handover',
+]);
+export const approvalMode = pgEnum('approval_mode', ['any_one', 'all_required']);
+export const approvalRequestStatus = pgEnum('approval_request_status', [
+  'pending',
+  'approved',
+  'changes_requested',
+  'cancelled',
+  'invalidated',
+]);
+export const approvalDecisionType = pgEnum('approval_decision_type', [
+  'approved',
+  'changes_requested',
+]);
 export const projectStageStatus = pgEnum('project_stage_status', [
   'not_started',
   'in_progress',
@@ -1481,6 +1500,224 @@ export const projectCoverCapture = pgTable(
     check(
       'project_cover_capture_completion_check',
       sql`(${table.status} = 'succeeded' AND ${table.resultAssetId} IS NOT NULL AND ${table.completedAt} IS NOT NULL AND ${table.failureCode} IS NULL) OR (${table.status} = 'failed' AND ${table.resultAssetId} IS NULL AND ${table.completedAt} IS NOT NULL AND ${table.failureCode} IS NOT NULL) OR (${table.status} IN ('pending', 'processing') AND ${table.resultAssetId} IS NULL AND ${table.completedAt} IS NULL)`,
+    ),
+  ],
+);
+
+export interface ApprovalEntitySnapshot {
+  readonly title: string;
+  readonly summary?: string;
+  readonly revision: string;
+  readonly capturedAt: string;
+  readonly details: Readonly<Record<string, string | number | boolean | null>>;
+}
+
+export const approvalRequest = pgTable(
+  'approval_request',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    entityType: approvalEntityType('entity_type').notNull(),
+    targetKey: text('target_key').notNull(),
+    scopeRevisionId: uuid('scope_revision_id'),
+    stageId: uuid('stage_id'),
+    siteVersionId: uuid('site_version_id'),
+    fileObjectId: uuid('file_object_id'),
+    entityRevision: text('entity_revision').notNull(),
+    entitySnapshot: jsonb('entity_snapshot').$type<ApprovalEntitySnapshot>().notNull(),
+    snapshotChecksum: text('snapshot_checksum').notNull(),
+    acknowledgementText: text('acknowledgement_text').notNull(),
+    acknowledgementChecksum: text('acknowledgement_checksum').notNull(),
+    mode: approvalMode('mode').notNull().default('any_one'),
+    status: approvalRequestStatus('status').notNull().default('pending'),
+    requestedByUserId: uuid('requested_by_user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'restrict' }),
+    idempotencyKey: text('idempotency_key').notNull(),
+    requestedAt: timestamp('requested_at', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true, mode: 'date' }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true, mode: 'date' }),
+    cancelReason: text('cancel_reason'),
+    invalidatedAt: timestamp('invalidated_at', { withTimezone: true, mode: 'date' }),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [project.id, project.workspaceId],
+      name: 'approval_request_project_workspace_fk',
+    }).onDelete('restrict'),
+    foreignKey({
+      columns: [table.scopeRevisionId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        projectScopeRevision.id,
+        projectScopeRevision.projectId,
+        projectScopeRevision.workspaceId,
+      ],
+      name: 'approval_request_scope_project_workspace_fk',
+    }).onDelete('restrict'),
+    foreignKey({
+      columns: [table.stageId, table.projectId, table.workspaceId],
+      foreignColumns: [projectStage.id, projectStage.projectId, projectStage.workspaceId],
+      name: 'approval_request_stage_project_workspace_fk',
+    }).onDelete('restrict'),
+    foreignKey({
+      columns: [table.siteVersionId, table.projectId, table.workspaceId],
+      foreignColumns: [siteVersion.id, siteVersion.projectId, siteVersion.workspaceId],
+      name: 'approval_request_version_project_workspace_fk',
+    }).onDelete('restrict'),
+    foreignKey({
+      columns: [table.fileObjectId, table.projectId, table.workspaceId],
+      foreignColumns: [fileObject.id, fileObject.projectId, fileObject.workspaceId],
+      name: 'approval_request_file_project_workspace_fk',
+    }).onDelete('restrict'),
+    uniqueIndex('approval_request_id_project_workspace_unique').on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
+    uniqueIndex('approval_request_workspace_idempotency_unique').on(
+      table.workspaceId,
+      table.idempotencyKey,
+    ),
+    uniqueIndex('approval_request_active_target_unique')
+      .on(table.projectId, table.targetKey)
+      .where(sql`${table.status} = 'pending'`),
+    index('approval_request_project_status_created_idx').on(
+      table.projectId,
+      table.status,
+      table.createdAt,
+    ),
+    index('approval_request_workspace_status_idx').on(table.workspaceId, table.status),
+    check(
+      'approval_request_target_check',
+      sql`(${table.entityType} = 'scope_revision' AND ${table.scopeRevisionId} IS NOT NULL AND ${table.stageId} IS NULL AND ${table.siteVersionId} IS NULL AND ${table.fileObjectId} IS NULL) OR (${table.entityType} = 'project_stage' AND ${table.scopeRevisionId} IS NULL AND ${table.stageId} IS NOT NULL AND ${table.siteVersionId} IS NULL AND ${table.fileObjectId} IS NULL) OR (${table.entityType} = 'site_version' AND ${table.scopeRevisionId} IS NULL AND ${table.stageId} IS NULL AND ${table.siteVersionId} IS NOT NULL AND ${table.fileObjectId} IS NULL) OR (${table.entityType} = 'file_object' AND ${table.scopeRevisionId} IS NULL AND ${table.stageId} IS NULL AND ${table.siteVersionId} IS NULL AND ${table.fileObjectId} IS NOT NULL) OR (${table.entityType} = 'final_handover' AND ${table.scopeRevisionId} IS NULL AND ${table.stageId} IS NULL AND ${table.siteVersionId} IS NULL AND ${table.fileObjectId} IS NULL)`,
+    ),
+    check(
+      'approval_request_resolution_check',
+      sql`(${table.status} = 'pending' AND ${table.resolvedAt} IS NULL AND ${table.cancelledAt} IS NULL AND ${table.invalidatedAt} IS NULL) OR (${table.status} IN ('approved', 'changes_requested') AND ${table.resolvedAt} IS NOT NULL AND ${table.cancelledAt} IS NULL AND ${table.invalidatedAt} IS NULL) OR (${table.status} = 'cancelled' AND ${table.resolvedAt} IS NULL AND ${table.cancelledAt} IS NOT NULL AND nullif(btrim(${table.cancelReason}), '') IS NOT NULL AND ${table.invalidatedAt} IS NULL) OR (${table.status} = 'invalidated' AND ${table.resolvedAt} IS NULL AND ${table.cancelledAt} IS NULL AND ${table.invalidatedAt} IS NOT NULL)`,
+    ),
+  ],
+);
+
+export const approvalRequestApprover = pgTable(
+  'approval_request_approver',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    approvalRequestId: uuid('approval_request_id').notNull(),
+    userId: uuid('user_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.approvalRequestId, table.projectId, table.workspaceId],
+      foreignColumns: [approvalRequest.id, approvalRequest.projectId, approvalRequest.workspaceId],
+      name: 'approval_approver_request_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.projectId, table.workspaceId, table.userId],
+      foreignColumns: [
+        projectMembership.projectId,
+        projectMembership.workspaceId,
+        projectMembership.userId,
+      ],
+      name: 'approval_approver_project_member_fk',
+    }).onDelete('restrict'),
+    uniqueIndex('approval_approver_request_user_unique').on(table.approvalRequestId, table.userId),
+    uniqueIndex('approval_approver_request_user_project_workspace_unique').on(
+      table.approvalRequestId,
+      table.userId,
+      table.projectId,
+      table.workspaceId,
+    ),
+    index('approval_approver_user_idx').on(table.workspaceId, table.userId),
+  ],
+);
+
+export const approvalDecision = pgTable(
+  'approval_decision',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    approvalRequestId: uuid('approval_request_id').notNull(),
+    approverUserId: uuid('approver_user_id').notNull(),
+    decision: approvalDecisionType('decision').notNull(),
+    comment: text('comment'),
+    idempotencyKey: text('idempotency_key').notNull(),
+    networkFingerprint: text('network_fingerprint'),
+    userAgent: text('user_agent'),
+    decidedAt: timestamp('decided_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.approvalRequestId, table.approverUserId, table.projectId, table.workspaceId],
+      foreignColumns: [
+        approvalRequestApprover.approvalRequestId,
+        approvalRequestApprover.userId,
+        approvalRequestApprover.projectId,
+        approvalRequestApprover.workspaceId,
+      ],
+      name: 'approval_decision_assigned_approver_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('approval_decision_request_approver_unique').on(
+      table.approvalRequestId,
+      table.approverUserId,
+    ),
+    uniqueIndex('approval_decision_request_idempotency_unique').on(
+      table.approvalRequestId,
+      table.idempotencyKey,
+    ),
+    index('approval_decision_project_created_idx').on(table.projectId, table.createdAt),
+    check(
+      'approval_decision_comment_check',
+      sql`${table.decision} <> 'changes_requested' OR nullif(btrim(${table.comment}), '') IS NOT NULL`,
+    ),
+  ],
+);
+
+export const externalDecisionRecord = pgTable(
+  'external_decision_record',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    approvalRequestId: uuid('approval_request_id').notNull(),
+    decision: approvalDecisionType('decision').notNull(),
+    source: text('source').notNull(),
+    sourceDecisionAt: timestamp('source_decision_at', {
+      withTimezone: true,
+      mode: 'date',
+    }).notNull(),
+    recordedByUserId: uuid('recorded_by_user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'restrict' }),
+    explanation: text('explanation').notNull(),
+    idempotencyKey: text('idempotency_key').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.approvalRequestId, table.projectId, table.workspaceId],
+      foreignColumns: [approvalRequest.id, approvalRequest.projectId, approvalRequest.workspaceId],
+      name: 'external_decision_request_project_workspace_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('external_decision_request_idempotency_unique').on(
+      table.approvalRequestId,
+      table.idempotencyKey,
+    ),
+    uniqueIndex('external_decision_request_unique').on(table.approvalRequestId),
+    index('external_decision_project_created_idx').on(table.projectId, table.createdAt),
+    check('external_decision_source_check', sql`nullif(btrim(${table.source}), '') IS NOT NULL`),
+    check(
+      'external_decision_explanation_check',
+      sql`nullif(btrim(${table.explanation}), '') IS NOT NULL`,
     ),
   ],
 );

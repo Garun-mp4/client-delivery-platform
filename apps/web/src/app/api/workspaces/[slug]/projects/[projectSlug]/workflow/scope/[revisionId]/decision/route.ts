@@ -16,8 +16,10 @@ export async function POST(
   const form = await request.formData();
   const decision = form.get('decision');
   const comment = form.get('comment');
+  const acknowledgementAccepted = form.get('acknowledgementAccepted');
   try {
     if (decision !== 'agreed' && decision !== 'changes_requested') throw new Error('INVALID');
+    if (acknowledgementAccepted !== 'yes') throw new Error('ACKNOWLEDGEMENT_REQUIRED');
     await decideScopeRevision(
       database,
       tenant,

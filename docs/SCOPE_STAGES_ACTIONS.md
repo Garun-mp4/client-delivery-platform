@@ -16,15 +16,16 @@
 6. Клиентский экран показывает одно главное действие: согласовать scope либо выполнить наиболее
    важное назначенное действие.
 
-Scope agreement Milestone 04 использует `any_one` и одного назначенного согласующего. Общая approval
-strategy, несколько approvers, `all_required` и stage approvals относятся к Milestone 08.
+Начиная с Milestone 08 scope использует общий approval primitive: доступны несколько явно
+назначенных согласующих, режимы `any_one`/`all_required`, immutable snapshot и audit trail. Тот же
+primitive применяется к этапам, версиям сайта, файлам и финальной передаче.
 
 ## Состояния
 
 - Scope: `draft → client_review → agreed|superseded`. Согласованный текст защищён DB trigger.
 - Этап: `not_started`, `in_progress`, `waiting_for_client`, `ready_for_review`,
   `changes_requested`, `approved`, `skipped`. В Milestone 04 общий переход в `approved` закрыт до
-  появления общего approval flow; `ready_for_review` требует результат, `skipped` — причину.
+  общий approval flow; `ready_for_review` требует результат, `skipped` — причину.
 - Действие: `open → in_progress|done|cancelled`, `in_progress → done|cancelled`. Terminal states
   необратимы.
 

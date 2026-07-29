@@ -514,6 +514,38 @@ Drizzle оборачивает исходную ошибку драйвера. D
 healthy. Повтор безопасен для цельной read projection, но общий retry mutation мог бы продублировать
 бизнес-операцию, audit или outbox event. Статический IP ломает переносимость Compose/SaaS-схемы.
 
+### ADR-045. Универсальный approval snapshot и сериализуемое решение
+
+**Решение:** общий `ApprovalRequest` ссылается составным tenant/project foreign key на один
+конкретный scope revision, stage, client-visible SiteVersion, client-visible clean file либо final
+handover. При создании сохраняются revision, JSON snapshot, SHA-256 checksum и точный снимок
+настраиваемого нейтрального acknowledgement text. Согласующие хранятся явно; доступны
+`any_one` и `all_required`. `ApprovalDecision` создаётся только назначенным client approver с
+активным project membership и `canApprove`. Транзакция использует row lock, serializable isolation,
+idempotency key и ограниченный retry только для PostgreSQL `40001/40P01`. Решение и внешний record
+защищены database trigger от изменения.
+
+IP не хранится: web создаёт workspace-scoped HMAC fingerprint с `BETTER_AUTH_SECRET`; user agent
+очищается от control characters и ограничивается 256 символами. Клиент получает только назначенные
+requests, client-visible snapshot и allowlisted audit actions. Blocking feedback запрещает request
+и решение stage/version. Новая revision того же target, а для scope/site/final — новая обязательная
+revision семейства, переводит старый pending request в `invalidated`.
+
+`recorded_externally` хранится в отдельной `ExternalDecisionRecord`, содержит source,
+sourceDecisionAt, recordedByUserId и explanation и никогда не создаёт клиентский
+`ApprovalDecision`. Владелец может только создать/отменить request или записать этот отдельный
+external record. Обычные scope-согласования переведены на общий primitive; старые таблицы остаются
+только для совместимости уже существующей migration history и не получают новых записей.
+
+**Альтернативы:** отдельные approval tables для каждого entity; подпись только текущего mutable
+объекта; optimistic update без row lock; raw IP; owner-as-approver; подмена внешнего решения
+клиентским; отдельный queue/service.
+
+**Причина:** единый snapshot делает решение проверяемым без размножения state machines. Composite
+FK и server policy закрывают cross-tenant/IDOR, serializable retry корректно обрабатывает
+одновременные решения, а отдельный внешний record не искажает происхождение решения. Новых
+production dependencies не требуется.
+
 ## 5. Планируемая структура репозитория
 
 Каталоги создаются по мере появления рабочего кода, а не пустым scaffold заранее.
