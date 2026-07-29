@@ -213,6 +213,8 @@ $env:TEST_MINIO_ENDPOINT = 'http://localhost:9000'
 $env:TEST_MINIO_ACCESS_KEY = 'garun_local'
 $env:TEST_MINIO_SECRET_KEY = 'local_only_change_me'
 $env:TEST_MAILPIT_URL = 'http://localhost:8025'
+$env:TEST_SCANNER_HOST = 'localhost'
+$env:TEST_SCANNER_PORT = '3310'
 pnpm test:integration
 ```
 

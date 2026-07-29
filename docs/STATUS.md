@@ -1,17 +1,13 @@
 # Статус реализации
 
-Последнее обновление: 2026-07-18
+Последнее обновление: 2026-07-29
 Общий статус: Milestones 00–07 и UX stabilization Milestone 06.5 завершены
 
 ## Текущий milestone
 
-**Milestone 07 — обновления, версии сайта и review loop — завершён в
-`feat/milestone-07-review-loop`.** Реализован рабочий путь от публикации обновления и безопасно
-проверенной версии до клиентского замечания, исправления, проверки и закрытия. Milestone 08 не начат.
-
-Ветка Milestone 07 построена поверх `feat/milestone-06-5-ux-foundation`, поскольку на момент начала
-UX-ветка ещё не была объединена в `main`. При создании PR необходимо сохранять порядок merge:
-сначала Milestone 06.5, затем Milestone 07.
+**Milestone 07 — обновления, версии сайта и review loop — завершён и объединён в `main`.**
+Milestone 06, UX stabilization 06.5 и Milestone 07 последовательно объединены без конфликтов.
+Milestone 08 не начат.
 
 ## Завершённые задачи
 
@@ -41,8 +37,8 @@ UX-ветка ещё не была объединена в `main`. При соз
 
 ## Текущие задачи
 
-- Создать Pull Request `feat/milestone-07-review-loop` после PR/merge Milestone 06.5.
-- Milestone 08 не начинать до merge и отдельного подтверждения.
+- Активной реализации нет.
+- Milestone 08 не начинать без отдельного подтверждения.
 
 ## Найденные проблемы
 
@@ -63,6 +59,13 @@ UX-ветка ещё не была объединена в `main`. При соз
   сбрасывает счётчик, а история допускает одинаковый относительный номер попытки в разных циклах.
 - Первый `pnpm db:generate` в текущей shell завершился ошибкой из-за отсутствующего `DATABASE_URL`.
   После явного test URL команда прошла и подтвердила отсутствие drift.
+- Проверка после merge обнаружила новые runtime advisories Next.js и Sharp; зависимости обновлены
+  до исправленных версий. Безопасного совместимого обновления dev-only ESLint-цепочки для
+  `GHSA-mh99-v99m-4gvg` пока нет: глобальный override ломает minimatch 3, ESLint 10 — React plugin.
+- Первая пересборка Docker завершилась внешней ошибкой Docker Desktop `rpc Unavailable: EOF`;
+  повторная сборка с тем же lockfile и cache прошла. Первый integration run сразу после тяжёлой
+  сборки исчерпал 10-секундный setup timeout; повторный прогон на прогретой БД прошёл 29/29 без
+  изменения тестов или timeout.
 
 ## Принятые решения
 
@@ -74,6 +77,8 @@ UX-ветка ещё не была объединена в `main`. При соз
   консервативно по X-Frame-Options/CSP.
 - PostgreSQL остаётся текущей лёгкой job queue; новая production dependency или микросервис не
   добавлялись.
+- ADR-042: runtime advisories исправляются обновлением Next.js/Sharp; единственное исключение audit
+  ограничено dev-only ESLint advisory и документировано до совместимого upstream-обновления.
 
 ## Выполненные проверки
 
@@ -88,7 +93,11 @@ UX-ветка ещё не была объединена в `main`. При соз
   structured feedback, owner transitions, client close и axe.
 - `docker compose up -d --build --wait` — migration/storage-init exited 0; web, worker, PostgreSQL,
   Redis, MinIO, Mailpit и ClamAV healthy.
-- `pnpm smoke` — web/worker passed; `pnpm audit --prod` — известных уязвимостей нет.
+- `pnpm smoke` — web/worker passed; `pnpm audit --prod` — runtime advisories отсутствуют, один
+  документированный dev-only advisory ESLint toolchain игнорируется по ADR-042.
+- Финальная post-merge проверка 2026-07-29: frozen install, format, lint, typecheck, unit tests,
+  migration drift, build/artifact, integration 29/29, E2E/a11y 20/20, Compose healthchecks и smoke
+  прошли на Next.js `16.2.11` и Sharp `0.35.3`.
 - GitHub Actions run `29655680474` для commit `5eb60ef` — успешно; install, audit, format, lint,
   typecheck, migration drift/apply, unit, integration, build, artifact, browser/a11y и smoke зелёные.
 - `git diff --check`, tracked env/artifact scan, high-confidence secret scan, type-suppression scan и
@@ -96,9 +105,8 @@ UX-ветка ещё не была объединена в `main`. При соз
 
 ## Следующие действия
 
-1. Создать Pull Request Milestone 06.5, если он ещё не создан, и объединить его первым.
-2. Создать Pull Request `feat/milestone-07-review-loop`, проверить CI и объединить после 06.5.
-3. После отдельного подтверждения перейти к Milestone 08 — общие согласования и audit trail.
+1. Дождаться успешного CI объединённого `main`.
+2. После отдельного подтверждения создать ветку Milestone 08 — общие согласования и audit trail.
 
 ## Известные ограничения
 
