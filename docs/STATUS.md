@@ -1,13 +1,12 @@
 # Статус реализации
 
 Последнее обновление: 2026-07-29
-Общий статус: Milestones 00–09 и UX stabilization 06.5 завершены в feature-ветках
+Общий статус: Milestones 00–09 и UX stabilization 06.5 завершены и объединены с `main`
 
 ## Текущий milestone
 
-**Milestone 09 — уведомления, завершение и архив — реализован и проверен в
-`feat/milestone-09-notifications-archive`.** До объединения требуется Pull Request и зелёный CI.
-Milestone 10 не начинался.
+**Milestone 09 — уведомления, завершение и архив — реализован, проверен и объединён с `main`.**
+Post-merge CI `30479044166` завершён успешно. Milestone 10 не начинался.
 
 ## Завершённые задачи
 
@@ -72,8 +71,8 @@ Milestone 10 не начинался.
 
 ## Текущие задачи
 
-- Создать commit, отправить feature-ветку и получить зелёный CI/PR review.
-- Не начинать Milestone 10 до объединения и post-merge проверки Milestone 09.
+- Активных задач Milestone 09 нет.
+- Не начинать Milestone 10 до отдельного запроса.
 
 ## Найденные проблемы
 
@@ -234,12 +233,13 @@ Milestone 10 не начинался.
 - Production web/worker build и artifact verification успешны; полный Playwright/axe suite 22/22.
 - Compose migration/storage-init exited 0; web, worker, PostgreSQL, Redis, MinIO, Mailpit и ClamAV
   healthy. Liveness/readiness вернули 200; повторный `pnpm smoke` прошёл.
+- Post-merge CI `30479044166` на `main`: install с frozen lockfile, production audit, format,
+  lint, strict typecheck, migration drift, unit/integration, clean migrations, build, artifact
+  verification, Playwright/axe и smoke завершены успешно.
 
 ## Следующие действия
 
-1. Отправить `feat/milestone-09-notifications-archive`, открыть Pull Request и дождаться CI/review.
-2. После merge выполнить короткую post-merge проверку `main`.
-3. Следующим будет Milestone 10 — hardening, observability и production readiness; не начинать его
+1. Следующим будет Milestone 10 — hardening, observability и production readiness; не начинать его
    до отдельного запроса.
 
 ## Известные ограничения
