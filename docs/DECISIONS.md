@@ -499,6 +499,21 @@ runtime. В логах допустимы только workspace/project/job ID 
 новая production-зависимость: без browser engine нельзя получить реальный first-viewport render
 современного сайта; Sharp и storage уже присутствуют.
 
+### ADR-044. Ограниченный retry только для идемпотентного server-side чтения
+
+**Решение:** server rendering страницы проекта может повторить весь read-only projection после
+узкого набора временных connection errors (`EAI_AGAIN`, reset/refused/timeout и PostgreSQL restart
+codes). Используются две короткие задержки. Классификатор проходит по вложенному `cause`, поскольку
+Drizzle оборачивает исходную ошибку драйвера. Domain mutations, transactions и неизвестные SQL-коды
+автоматически не повторяются.
+
+**Альтернативы:** показывать error boundary при единичном Docker DNS сбое; retry каждого repository
+метода; глобально повторять любые запросы; выдавать контейнеру статический IP PostgreSQL.
+
+**Причина:** Docker service DNS может кратковременно вернуть `EAI_AGAIN`, хотя PostgreSQL остаётся
+healthy. Повтор безопасен для цельной read projection, но общий retry mutation мог бы продублировать
+бизнес-операцию, audit или outbox event. Статический IP ломает переносимость Compose/SaaS-схемы.
+
 ## 5. Планируемая структура репозитория
 
 Каталоги создаются по мере появления рабочего кода, а не пустым scaffold заранее.

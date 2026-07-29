@@ -15,6 +15,7 @@ import {
   resolveProjectAccess,
 } from '@garun/core/projects';
 import { getProjectWorkflow } from '@garun/core/workflow';
+import { withDatabaseReadRetry } from '@garun/db';
 
 import { ProjectNav } from './_components/project-nav';
 import { ProjectRoute } from './_components/project-route';
@@ -102,13 +103,12 @@ function ClientProjectView({
   );
 }
 
-export default async function ProjectPage({
-  params,
-  searchParams,
-}: {
+interface ProjectPageProps {
   params: Promise<{ slug: string; projectSlug: string }>;
   searchParams: Promise<{ preview?: string; success?: string; error?: string }>;
-}) {
+}
+
+async function renderProjectPage({ params, searchParams }: ProjectPageProps) {
   const [{ slug, projectSlug }, feedback] = await Promise.all([params, searchParams]);
   const { tenant } = await requireTenantPage(slug);
   const access = await resolveProjectAccess(database.db, tenant, projectSlug);
@@ -483,4 +483,8 @@ export default async function ProjectPage({
       </details>
     </main>
   );
+}
+
+export default function ProjectPage(props: ProjectPageProps) {
+  return withDatabaseReadRetry(() => renderProjectPage(props));
 }

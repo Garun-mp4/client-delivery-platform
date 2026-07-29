@@ -80,6 +80,10 @@
 - Docker Desktop запрещает namespace sandbox non-root Chromium. Выдача `SYS_ADMIN` отклонена;
   локально browser остаётся non-root в container boundary и без прямой сети, а production hardened
   sandbox зафиксирован обязательным deployment review.
+- После успешной постановки cover capture Docker DNS один раз вернул web-контейнеру
+  `getaddrinfo EAI_AGAIN postgres`. Capture завершился и данные не пострадали, но read projection
+  показал dev error overlay. ADR-044 добавляет узкий retry только для идемпотентного чтения страницы;
+  SQL/domain errors и mutations не повторяются.
 
 ## Принятые решения
 
@@ -95,6 +99,8 @@
   ограничено dev-only ESLint advisory и документировано до совместимого upstream-обновления.
 - ADR-043: project covers приватны; приоритет manual → automatic → empty; renderer является
   adapter и загружает каждый browser resource только через SSRF-safe IP-pinned transport.
+- ADR-044: временные DB connection errors повторяются только на границе цельного read-only server
+  render; mutation retry по умолчанию запрещён.
 
 ## Выполненные проверки
 
@@ -127,6 +133,10 @@
   read → delete, а automatic capture `example.com` завершился за одну попытку и создал result asset.
 - Compose rebuild/healthchecks и web/worker smoke успешны. `pnpm audit --prod` не нашёл runtime
   advisory; один документированный high dev-only ESLint advisory игнорируется по ADR-042.
+- Regression после временного Docker DNS failure: новый unit suite для read retry 2/2, повторные
+  format/lint/typecheck/unit/integration/build/artifact проверки, project E2E 1/1, Compose
+  healthchecks и smoke успешны; свежие логи не содержат повторного `EAI_AGAIN` или чувствительных
+  значений.
 
 ## Следующие действия
 
