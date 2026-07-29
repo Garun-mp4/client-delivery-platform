@@ -5,8 +5,8 @@
 
 ## Текущий milestone
 
-**Milestone 08 — согласования и audit trail — завершён в
-`feat/milestone-08-approvals-audit`.** Следующий milestone — 09; его реализация не начиналась.
+**Milestone 08 — согласования и audit trail — завершён и объединён с `main`.** Следующий
+milestone — 09; его реализация не начиналась.
 
 ## Завершённые задачи
 
@@ -57,7 +57,7 @@
 ## Текущие задачи
 
 - Нет активных задач Milestone 08.
-- Перед Milestone 09 требуется обычный review/merge текущей feature-ветки.
+- Перед Milestone 09 требуется подтвердить зелёный post-merge CI на `main`.
 
 ## Найденные проблемы
 
@@ -189,12 +189,14 @@
 - `pnpm audit --prod --audit-level=high` не нашёл runtime advisory; один документированный ignored
   high advisory остаётся только в dev-only ESLint toolchain по ADR-042. `git diff --check`,
   tracked-file hygiene и high-confidence secret scan прошли.
+- Post-merge проверка `main`: frozen install, format, lint, strict typecheck, unit 48/19/14,
+  migration drift, integration 35/35, production build/artifact, Playwright/axe 20/20 и smoke
+  прошли без ошибок.
 
 ## Следующие действия
 
-1. Провести review и объединить `feat/milestone-08-approvals-audit` с `main`.
-2. После merge повторить CI на `main`.
-3. Затем подготовить отдельную ветку Milestone 09; до merge Milestone 08 его не начинать.
+1. Подтвердить зелёный post-merge CI на `main`.
+2. Затем подготовить отдельную ветку Milestone 09; его реализация ещё не начиналась.
 
 ## Известные ограничения
 
