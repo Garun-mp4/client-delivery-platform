@@ -56,7 +56,7 @@ test('client resumes autosaved questionnaire and sends a clarified immutable rev
   await page.getByLabel('Название компании').fill(companyName);
   await page.getByRole('button', { name: 'Создать клиента' }).click();
   await page.goto('/workspace/e2e-studio/projects');
-  await page.getByRole('link', { name: 'Создать проект' }).click();
+  await page.locator('.catalog-header').getByRole('link', { name: 'Создать проект' }).click();
   await page.getByLabel('Название проекта').fill(projectName);
   await page.getByLabel('Адрес проекта').fill(projectSlug);
   await page.getByLabel('Компания клиента').selectOption({ label: companyName });

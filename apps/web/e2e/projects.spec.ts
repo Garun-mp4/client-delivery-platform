@@ -59,7 +59,7 @@ test('owner publishes one project and grants then revokes explicit client access
   await expect(page.getByRole('heading', { name: companyName })).toBeVisible();
 
   await page.goto('/workspace/e2e-studio/projects');
-  await page.getByRole('link', { name: 'Создать проект' }).click();
+  await page.locator('.catalog-header').getByRole('link', { name: 'Создать проект' }).click();
   await page.getByLabel('Название проекта').fill(projectName);
   await page.getByLabel('Адрес проекта').fill(projectSlug);
   await page.getByLabel('Компания клиента').selectOption({ label: companyName });
