@@ -143,6 +143,9 @@ Milestone 10 не начинался.
   намеренный `RESTRICT` immutable approval history при удалении тестового workspace. Cleanup теперь
   явно удаляет tenant-scoped approval requests до workspace; production delete semantics не
   ослаблялись.
+- Следующий CI подтвердил integration 43/43, но тот же явный cleanup требовался E2E-fixture перед
+  удалением проекта. Browser-сценарий теперь также сначала удаляет созданный им approval request;
+  production foreign keys остаются `RESTRICT`.
 
 ## Принятые решения
 

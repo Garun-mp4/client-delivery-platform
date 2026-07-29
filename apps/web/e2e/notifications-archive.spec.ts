@@ -146,7 +146,10 @@ test('notification deep link leads through completion, archive and restore', asy
     await page.getByRole('button', { name: 'Восстановить прежний статус' }).click();
     await expect(page.getByText('Завершён', { exact: true }).first()).toBeVisible();
   } finally {
-    if (projectId) await database.db.delete(project).where(eq(project.id, projectId));
+    if (projectId) {
+      await database.db.delete(approvalRequest).where(eq(approvalRequest.projectId, projectId));
+      await database.db.delete(project).where(eq(project.id, projectId));
+    }
     if (companyId) {
       await database.db.delete(clientCompany).where(eq(clientCompany.id, companyId));
     }
