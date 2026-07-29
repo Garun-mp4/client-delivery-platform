@@ -17,7 +17,7 @@ export default async function SentPage({
       ? webmailProviders[provider as keyof typeof webmailProviders]
       : null;
   return (
-    <main className="auth-shell">
+    <main className="auth-shell" id="main-content">
       <section className="auth-card">
         <p className="eyebrow">Письмо подготовлено</p>
         <h1>Проверьте почту</h1>

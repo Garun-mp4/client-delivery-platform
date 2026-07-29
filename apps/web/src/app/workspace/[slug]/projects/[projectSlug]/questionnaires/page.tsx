@@ -5,7 +5,7 @@ import { listQuestionnaireAssignees, listQuestionnaires } from '@garun/core/ques
 import { canAccessProject } from '@garun/core/projects';
 
 import { QuestionnaireBuilder } from './questionnaire-builder';
-import { WorkspaceNav } from '../../../_components/workspace-nav';
+import { ProjectNav } from '../_components/project-nav';
 import { requireTenantPage } from '@/lib/page-tenant';
 import { database } from '@/lib/server';
 
@@ -35,7 +35,7 @@ export default async function QuestionnairesPage({
 
   return (
     <main className="workspace-shell">
-      <header className="workspace-header">
+      <header className="page-header">
         <div>
           <p className="eyebrow">Сбор информации</p>
           <h1>Анкеты проекта</h1>
@@ -47,7 +47,7 @@ export default async function QuestionnairesPage({
           К проекту
         </Link>
       </header>
-      <WorkspaceNav slug={slug} internal={internal} />
+      <ProjectNav projectSlug={projectSlug} workspaceSlug={slug} />
       {feedback.error ? (
         <p className="notice error" role="alert">
           Анкету создать не удалось. Проверьте вопросы, варианты и назначенного участника.

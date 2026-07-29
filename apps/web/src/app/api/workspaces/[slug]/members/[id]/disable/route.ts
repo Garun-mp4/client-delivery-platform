@@ -58,7 +58,7 @@ export async function POST(
     });
   });
   return NextResponse.redirect(
-    publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}?success=disabled`),
+    publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}/access?success=disabled`),
     303,
   );
 }

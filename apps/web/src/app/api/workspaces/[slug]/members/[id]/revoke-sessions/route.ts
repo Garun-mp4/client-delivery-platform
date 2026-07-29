@@ -41,7 +41,7 @@ export async function POST(
     });
   });
   return NextResponse.redirect(
-    publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}?success=sessions`),
+    publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}/access?success=sessions`),
     303,
   );
 }

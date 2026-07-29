@@ -43,7 +43,7 @@ test('owner signs in with a password and reaches the protected workspace', async
   await page.goto('/login');
   await page.getByLabel('Email', { exact: true }).fill(ownerEmail);
   await page.getByLabel('Пароль').fill(ownerPassword);
-  await page.getByRole('button', { name: 'Войти с паролем' }).click();
+  await page.getByRole('button', { name: 'Войти' }).click();
 
   await expect(page).toHaveURL(/\/workspace\/e2e-studio/);
   await expect(page.getByText(ownerEmail, { exact: true })).toBeVisible();
@@ -57,18 +57,16 @@ test('owner invites a member and tenant policies deny owner actions to the membe
   const ownerEmail = process.env.E2E_OWNER_EMAIL ?? 'e2e-owner@example.test';
   const memberEmail = `e2e-member-${Date.now()}@example.test`;
   await page.goto('/login');
-  await page.getByLabel('Рабочий email').fill(ownerEmail);
-  const [requestLinkResponse] = await Promise.all([
-    page.waitForResponse((response) => response.url().includes('/api/auth/request-link')),
-    page.getByRole('button', { name: 'Получить ссылку для входа' }).click(),
-  ]);
-  expect(requestLinkResponse.status()).toBe(303);
+  await page.getByRole('tab', { name: 'Ссылка на почту' }).click();
+  await page.getByLabel('Email', { exact: true }).fill(ownerEmail);
+  await page.getByRole('button', { name: 'Получить ссылку' }).click();
   await expect(page.getByRole('heading', { name: 'Проверьте почту' })).toBeVisible();
   const ownerMail = await latestLink(request, ownerEmail);
   await page.goto(
     ownerMail.link.replace('http://localhost:3000', test.info().project.use.baseURL as string),
   );
   await expect(page).toHaveURL(/\/workspace\/e2e-studio/);
+  await page.getByRole('link', { name: 'Доступ', exact: true }).click();
   await page.getByLabel('Email участника').fill(memberEmail);
   await page.getByRole('button', { name: 'Отправить приглашение' }).click();
   await expect(page.getByText(memberEmail)).toBeVisible();
@@ -90,6 +88,7 @@ test('owner invites a member and tenant policies deny owner actions to the membe
     },
   );
   expect(directOwnerAction.status()).toBe(404);
+  await memberPage.getByRole('link', { name: 'Сеансы', exact: true }).click();
   await expect(memberPage.getByRole('heading', { name: 'Ваши активные сессии' })).toBeVisible();
   const accessibility = await new AxeBuilder({ page: memberPage }).analyze();
   expect(accessibility.violations).toEqual([]);

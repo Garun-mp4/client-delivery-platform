@@ -1,7 +1,7 @@
 import Link from 'next/link';
 export default function AcceptedPage() {
   return (
-    <main className="auth-shell">
+    <main className="auth-shell" id="main-content">
       <section className="auth-card">
         <p className="eyebrow">Приглашение принято</p>
         <h1>Доступ уже создан</h1>

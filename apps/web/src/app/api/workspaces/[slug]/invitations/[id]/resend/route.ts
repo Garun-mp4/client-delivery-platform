@@ -23,7 +23,7 @@ export async function POST(
       { requestId: request.headers.get('x-request-id') ?? undefined },
     );
     return NextResponse.redirect(
-      publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}?success=resent`),
+      publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}/access?success=resent`),
       303,
     );
   } catch {

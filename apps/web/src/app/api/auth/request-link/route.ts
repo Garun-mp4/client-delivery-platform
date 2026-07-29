@@ -1,7 +1,11 @@
 import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
-import { normalizeEmail, webmailProviderForEmail } from '@garun/core/identity';
+import {
+  normalizeEmail,
+  safeRelativeRedirect,
+  webmailProviderForEmail,
+} from '@garun/core/identity';
 import { auditEvent, user, workspaceMembership } from '@garun/db/schema';
 
 import { publicAppUrl } from '@/lib/public-url';
@@ -13,6 +17,7 @@ const generic = { ok: true, message: 'Если адрес разрешён, пи
 export async function POST(request: Request) {
   const form = await request.formData();
   const emailValue = form.get('email');
+  const callback = safeRelativeRedirect(form.get('callback')?.toString(), '/workspace');
   if (typeof emailValue !== 'string') return NextResponse.json(generic, { status: 202 });
   const email = normalizeEmail(emailValue);
   const sentUrl = publicAppUrl(environment.PUBLIC_APP_URL, '/login/sent');
@@ -36,7 +41,7 @@ export async function POST(request: Request) {
     .limit(1);
   if (eligible) {
     await auth.api.signInMagicLink({
-      body: { email, callbackURL: '/workspace', errorCallbackURL: '/login?error=link' },
+      body: { email, callbackURL: callback, errorCallbackURL: '/login?error=link' },
       headers: request.headers,
     });
     await database.db.insert(auditEvent).values({

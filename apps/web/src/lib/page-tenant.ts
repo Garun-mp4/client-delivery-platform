@@ -1,12 +1,13 @@
 import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
+import { cache } from 'react';
 
 import { can, resolveTenantContext } from '@garun/core/identity';
 import { auditEvent } from '@garun/db/schema';
 
 import { auth, database } from './server';
 
-export async function requireTenantPage(workspaceSlug: string) {
+export const requireTenantPage = cache(async function requireTenantPage(workspaceSlug: string) {
   const requestHeaders = await headers();
   const identity = await auth.api.getSession({ headers: requestHeaders });
   if (!identity) redirect(`/login?callback=/workspace/${workspaceSlug}`);
@@ -22,4 +23,4 @@ export async function requireTenantPage(workspaceSlug: string) {
     notFound();
   }
   return { identity, tenant, requestHeaders };
-}
+});

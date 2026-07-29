@@ -9,7 +9,7 @@ import {
 import { canAccessProject } from '@garun/core/projects';
 
 import { QuestionnaireForm } from '../questionnaire-form';
-import { WorkspaceNav } from '../../../../_components/workspace-nav';
+import { ProjectNav } from '../../_components/project-nav';
 import { requireTenantPage } from '@/lib/page-tenant';
 import { database } from '@/lib/server';
 
@@ -125,7 +125,7 @@ export default async function QuestionnairePage({
 
   return (
     <main className="workspace-shell questionnaire-page">
-      <header className="workspace-header">
+      <header className="page-header">
         <div>
           <p className="eyebrow">Анкета · {statusLabels[item.status]}</p>
           <h1>{item.title}</h1>
@@ -138,7 +138,7 @@ export default async function QuestionnairePage({
           Ко всем анкетам
         </Link>
       </header>
-      <WorkspaceNav slug={slug} internal={internal} />
+      <ProjectNav projectSlug={projectSlug} workspaceSlug={slug} />
       {feedback.success ? (
         <p className="notice success" role="status">
           Операция выполнена.

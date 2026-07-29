@@ -4,9 +4,21 @@ import { expect, test } from '@playwright/test';
 test('shows the product entry page', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { name: 'Garun Workspace' })).toBeVisible();
-  await expect(page.getByText('Инженерная основа запущена')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Откройте проект и сразу увидьте следующий шаг' }),
+  ).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Войти в рабочее пространство' })).toBeVisible();
   await expect(page).toHaveTitle('Garun Workspace');
+});
+
+test('login offers one clear method at a time', async ({ page }) => {
+  await page.goto('/login');
+
+  await expect(page.getByRole('tabpanel')).toContainText('Для владельца');
+  await expect(page.getByLabel('Пароль')).toBeVisible();
+  await page.getByRole('tab', { name: 'Ссылка на почту' }).click();
+  await expect(page.getByRole('tabpanel')).toContainText('одноразовую ссылку');
+  await expect(page.getByLabel('Пароль')).toHaveCount(0);
 });
 
 test('login page has no automatically detectable accessibility violations', async ({ page }) => {

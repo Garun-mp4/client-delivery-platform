@@ -1,5 +1,6 @@
 import { inspectInvitation } from '@garun/auth';
 
+import { SubmitButton } from '@/app/_components/submit-button';
 import { database } from '@/lib/server';
 
 export default async function InvitationPage({ params }: { params: Promise<{ token: string }> }) {
@@ -20,7 +21,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
   if (state !== 'pending') {
     const [title, body] = messages[state];
     return (
-      <main className="auth-shell">
+      <main className="auth-shell" id="main-content">
         <section className="auth-card">
           <p className="eyebrow">Доступ</p>
           <h1>{title}</h1>
@@ -30,7 +31,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
     );
   }
   return (
-    <main className="auth-shell">
+    <main className="auth-shell" id="main-content">
       <section className="auth-card">
         <p className="eyebrow">Персональное приглашение</p>
         <h1>Открыть доступ</h1>
@@ -40,7 +41,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
         </p>
         <form action="/api/invitations/accept" method="post">
           <input type="hidden" name="token" value={token} />
-          <button type="submit">Принять приглашение</button>
+          <SubmitButton pendingText="Открываем доступ…">Принять приглашение</SubmitButton>
         </form>
       </section>
     </main>

@@ -16,7 +16,7 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   }
   if (!(await allowSensitiveRequest('invitation-create', tenant.userId, 20, 3600))) {
     return NextResponse.redirect(
-      publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}?error=rate_limit`),
+      publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}/access?error=rate_limit`),
       303,
     );
   }
@@ -24,7 +24,7 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   const email = form.get('email');
   if (typeof email !== 'string')
     return NextResponse.redirect(
-      publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}?error=invite`),
+      publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}/access?error=invite`),
       303,
     );
   try {
@@ -40,13 +40,13 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
       { requestId: request.headers.get('x-request-id') ?? undefined },
     );
     return NextResponse.redirect(
-      publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}?success=invite`),
+      publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}/access?success=invite`),
       303,
     );
   } catch (error) {
     const code = error instanceof InvitationError ? error.code.toLowerCase() : 'invite';
     return NextResponse.redirect(
-      publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}?error=${code}`),
+      publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}/access?error=${code}`),
       303,
     );
   }

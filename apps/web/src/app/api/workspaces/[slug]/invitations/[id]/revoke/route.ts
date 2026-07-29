@@ -18,7 +18,7 @@ export async function POST(
       requestId: request.headers.get('x-request-id') ?? undefined,
     });
     return NextResponse.redirect(
-      publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}?success=revoked`),
+      publicAppUrl(environment.PUBLIC_APP_URL, `/workspace/${slug}/access?success=revoked`),
       303,
     );
   } catch {
