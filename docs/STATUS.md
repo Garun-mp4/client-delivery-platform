@@ -1,16 +1,16 @@
 # Статус реализации
 
 Последнее обновление: 2026-07-29
-Общий статус: Milestones 00–09 и UX stabilization 06.5 объединены с `main`; инженерная часть
-Milestone 10 завершена в feature-ветке, внешний staging/pilot ожидает инфраструктуру
+Общий статус: Milestones 00–10 и UX stabilization 06.5 объединены с `main`; внешний
+staging/pilot ожидает инфраструктуру
 
 ## Текущий milestone
 
-**Milestone 10 — production readiness и первый пилот: локальная инженерная приёмка завершена.**
+**Milestone 10 — production readiness и первый пилот: инженерная часть объединена с `main`.**
 Экспорт истории, observability, backup/restore, performance/security automation и pilot runbook
-готовы. Полное закрытие milestone требует развёртывания предварительно выбранной production-like
-инфраструктуры и проведения реального пилота; домен, платные сервисы и production secrets не
-создавались.
+готовы. Feature CI `30487810446` завершён успешно. Внешняя приёмка требует развёртывания
+предварительно выбранной production-like инфраструктуры и проведения реального пилота; домен,
+платные сервисы и production secrets не создавались.
 
 ## Завершённые задачи
 
@@ -289,13 +289,15 @@ Milestone 10 завершена в feature-ветке, внешний staging/pi
   healthy; migration/storage-init завершились успешно.
 - `pnpm audit --prod`: один документированный ignored high advisory dev-only ESLint toolchain по
   ADR-042, активных runtime advisories нет. Secret scan прошёл для 413 tracked/untracked файлов.
+- Feature CI `30487810446` для commit `43470e6` успешно выполнил quality, migration, security,
+  performance, build, browser/a11y, secret scan и smoke gates перед fast-forward merge в `main`.
 
 ## Следующие действия
 
 1. Создать production-like staging только после подтверждения провайдеров, домена и бюджета.
 2. Настроить внешние secrets/backup destination/alerts и выполнить staging deployment checklist.
 3. Провести один реальный пилот, собрать обратную связь и зафиксировать go/no-go.
-4. После внешней приёмки объединить Milestone 10; Milestone 11 не начинать автоматически.
+4. После внешней приёмки зафиксировать результат пилота; Milestone 11 не начинать автоматически.
 
 ## Известные ограничения
 
