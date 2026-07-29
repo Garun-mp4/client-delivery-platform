@@ -9,6 +9,7 @@
     "./materials": "./src/materials/index.ts",
     "./projects": "./src/projects/index.ts",
     "./questionnaires": "./src/questionnaires/index.ts",
+    "./review": "./src/review/index.ts",
     "./workflow": "./src/workflow/index.ts"
   },
   "scripts": {

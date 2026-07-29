@@ -164,6 +164,47 @@ export const fileScanStatus = pgEnum('file_scan_status', [
   'error',
 ]);
 export const fileVisibility = pgEnum('file_visibility', ['project', 'internal']);
+export const projectUpdateVisibility = pgEnum('project_update_visibility', ['internal', 'client']);
+export const projectUpdateImportance = pgEnum('project_update_importance', ['normal', 'important']);
+export const siteEnvironmentType = pgEnum('site_environment_type', [
+  'prototype',
+  'design',
+  'preview',
+  'staging',
+  'production',
+  'archived',
+]);
+export const siteAccessMode = pgEnum('site_access_mode', ['public', 'password']);
+export const urlSecurityStatus = pgEnum('url_security_status', [
+  'pending',
+  'checking',
+  'safe',
+  'unsafe',
+  'error',
+]);
+export const urlAvailabilityStatus = pgEnum('url_availability_status', [
+  'pending',
+  'reachable',
+  'unreachable',
+]);
+export const siteEmbedStatus = pgEnum('site_embed_status', ['unknown', 'allowed', 'blocked']);
+export const feedbackStatus = pgEnum('feedback_status', [
+  'new',
+  'accepted',
+  'clarification',
+  'in_progress',
+  'fixed',
+  'awaiting_verification',
+  'closed',
+  'rejected',
+]);
+export const feedbackPriority = pgEnum('feedback_priority', ['low', 'normal', 'high', 'blocking']);
+export const feedbackVisibility = pgEnum('feedback_visibility', ['internal', 'client']);
+export const feedbackClassification = pgEnum('feedback_classification', [
+  'in_scope',
+  'potential_change',
+]);
+export const commentVisibility = pgEnum('comment_visibility', ['internal', 'client']);
 
 // Better Auth core model. Application code always writes a normalized lowercase email.
 export const user = pgTable(
@@ -1174,6 +1215,244 @@ export const fileLink = pgTable(
     check(
       'file_link_single_context_check',
       sql`(${table.materialRevisionId} IS NOT NULL AND ${table.questionnaireId} IS NULL AND ${table.questionnaireFieldId} IS NULL) OR (${table.materialRevisionId} IS NULL AND ${table.questionnaireId} IS NOT NULL AND nullif(btrim(${table.questionnaireFieldId}), '') IS NOT NULL)`,
+    ),
+  ],
+);
+
+export const projectUpdate = pgTable(
+  'project_update',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    stageId: uuid('stage_id'),
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+    visibility: projectUpdateVisibility('visibility').notNull().default('client'),
+    importance: projectUpdateImportance('importance').notNull().default('normal'),
+    pinnedAt: timestamp('pinned_at', { withTimezone: true, mode: 'date' }),
+    createdByUserId: uuid('created_by_user_id').notNull(),
+    publishedAt: timestamp('published_at', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [project.id, project.workspaceId],
+      name: 'project_update_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.stageId, table.projectId, table.workspaceId],
+      foreignColumns: [projectStage.id, projectStage.projectId, projectStage.workspaceId],
+      name: 'project_update_stage_project_workspace_fk',
+    }).onDelete('restrict'),
+    foreignKey({
+      columns: [table.workspaceId, table.createdByUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'project_update_author_workspace_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('project_update_id_project_workspace_unique').on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
+    index('project_update_project_visibility_published_idx').on(
+      table.projectId,
+      table.visibility,
+      table.publishedAt,
+    ),
+    check(
+      'project_update_title_nonempty_check',
+      sql`nullif(btrim(${table.title}), '') IS NOT NULL`,
+    ),
+    check('project_update_body_nonempty_check', sql`nullif(btrim(${table.body}), '') IS NOT NULL`),
+  ],
+);
+
+export const siteVersion = pgTable(
+  'site_version',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    stageId: uuid('stage_id'),
+    versionNumber: integer('version_number').notNull(),
+    name: text('name').notNull(),
+    description: text('description'),
+    changeLog: text('change_log').notNull(),
+    checkInstructions: text('check_instructions').notNull(),
+    url: text('url').notNull(),
+    environmentType: siteEnvironmentType('environment_type').notNull(),
+    commitSha: text('commit_sha'),
+    deploymentExternalId: text('deployment_external_id'),
+    accessMode: siteAccessMode('access_mode').notNull().default('public'),
+    accessSecretEncrypted: text('access_secret_encrypted'),
+    securityStatus: urlSecurityStatus('security_status').notNull().default('pending'),
+    availabilityStatus: urlAvailabilityStatus('availability_status').notNull().default('pending'),
+    embedStatus: siteEmbedStatus('embed_status').notNull().default('unknown'),
+    clientVisible: boolean('client_visible').notNull().default(false),
+    checkAttempts: integer('check_attempts').notNull().default(0),
+    nextCheckAt: timestamp('next_check_at', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    checkedAt: timestamp('checked_at', { withTimezone: true, mode: 'date' }),
+    publishedByUserId: uuid('published_by_user_id').notNull(),
+    publishedAt: timestamp('published_at', { withTimezone: true, mode: 'date' }),
+    supersededAt: timestamp('superseded_at', { withTimezone: true, mode: 'date' }),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [project.id, project.workspaceId],
+      name: 'site_version_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.stageId, table.projectId, table.workspaceId],
+      foreignColumns: [projectStage.id, projectStage.projectId, projectStage.workspaceId],
+      name: 'site_version_stage_project_workspace_fk',
+    }).onDelete('restrict'),
+    foreignKey({
+      columns: [table.workspaceId, table.publishedByUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'site_version_publisher_workspace_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('site_version_project_number_unique').on(table.projectId, table.versionNumber),
+    uniqueIndex('site_version_id_project_workspace_unique').on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
+    index('site_version_check_queue_idx').on(table.securityStatus, table.nextCheckAt),
+    index('site_version_project_visibility_idx').on(
+      table.projectId,
+      table.clientVisible,
+      table.versionNumber,
+    ),
+    check('site_version_positive_number_check', sql`${table.versionNumber} > 0`),
+    check('site_version_name_nonempty_check', sql`nullif(btrim(${table.name}), '') IS NOT NULL`),
+    check('site_version_url_nonempty_check', sql`nullif(btrim(${table.url}), '') IS NOT NULL`),
+    check(
+      'site_version_access_secret_check',
+      sql`(${table.accessMode} = 'public' AND ${table.accessSecretEncrypted} IS NULL) OR (${table.accessMode} = 'password' AND ${table.accessSecretEncrypted} IS NOT NULL)`,
+    ),
+    check(
+      'site_version_publication_check',
+      sql`${table.clientVisible} = false OR (${table.securityStatus} = 'safe' AND ${table.publishedAt} IS NOT NULL)`,
+    ),
+  ],
+);
+
+export const siteVersionCheckAttempt = pgTable(
+  'site_version_check_attempt',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    siteVersionId: uuid('site_version_id').notNull(),
+    attempt: integer('attempt').notNull(),
+    securityStatus: urlSecurityStatus('security_status').notNull(),
+    availabilityStatus: urlAvailabilityStatus('availability_status').notNull(),
+    resultCode: text('result_code').notNull(),
+    finalUrlOrigin: text('final_url_origin'),
+    checkedAt: timestamp('checked_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.siteVersionId, table.projectId, table.workspaceId],
+      foreignColumns: [siteVersion.id, siteVersion.projectId, siteVersion.workspaceId],
+      name: 'site_version_attempt_version_project_workspace_fk',
+    }).onDelete('cascade'),
+    index('site_version_attempt_cycle_idx').on(table.siteVersionId, table.attempt),
+    index('site_version_attempt_project_checked_idx').on(table.projectId, table.checkedAt),
+    check('site_version_attempt_positive_check', sql`${table.attempt} > 0`),
+  ],
+);
+
+export const feedbackItem = pgTable(
+  'feedback_item',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    siteVersionId: uuid('site_version_id').notNull(),
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+    status: feedbackStatus('status').notNull().default('new'),
+    priority: feedbackPriority('priority').notNull().default('normal'),
+    visibility: feedbackVisibility('visibility').notNull().default('client'),
+    classification: feedbackClassification('classification').notNull().default('in_scope'),
+    pageUrl: text('page_url'),
+    screenshotFileId: uuid('screenshot_file_id'),
+    createdByUserId: uuid('created_by_user_id').notNull(),
+    assignedToUserId: uuid('assigned_to_user_id'),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true, mode: 'date' }),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.siteVersionId, table.projectId, table.workspaceId],
+      foreignColumns: [siteVersion.id, siteVersion.projectId, siteVersion.workspaceId],
+      name: 'feedback_version_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.screenshotFileId, table.projectId, table.workspaceId],
+      foreignColumns: [fileObject.id, fileObject.projectId, fileObject.workspaceId],
+      name: 'feedback_screenshot_project_workspace_fk',
+    }).onDelete('restrict'),
+    foreignKey({
+      columns: [table.workspaceId, table.createdByUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'feedback_author_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.assignedToUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'feedback_assignee_workspace_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('feedback_id_project_workspace_unique').on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
+    index('feedback_version_status_idx').on(table.siteVersionId, table.status),
+    index('feedback_project_status_updated_idx').on(table.projectId, table.status, table.updatedAt),
+    check('feedback_title_nonempty_check', sql`nullif(btrim(${table.title}), '') IS NOT NULL`),
+    check('feedback_body_nonempty_check', sql`nullif(btrim(${table.body}), '') IS NOT NULL`),
+  ],
+);
+
+export const comment = pgTable(
+  'comment',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    feedbackItemId: uuid('feedback_item_id').notNull(),
+    body: text('body').notNull(),
+    visibility: commentVisibility('visibility').notNull().default('client'),
+    authorUserId: uuid('author_user_id').notNull(),
+    editedAt: timestamp('edited_at', { withTimezone: true, mode: 'date' }),
+    deletedAt: timestamp('deleted_at', { withTimezone: true, mode: 'date' }),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.feedbackItemId, table.projectId, table.workspaceId],
+      foreignColumns: [feedbackItem.id, feedbackItem.projectId, feedbackItem.workspaceId],
+      name: 'comment_feedback_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.authorUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'comment_author_workspace_fk',
+    }).onDelete('cascade'),
+    index('comment_feedback_created_idx').on(table.feedbackItemId, table.createdAt),
+    check(
+      'comment_body_or_tombstone_check',
+      sql`${table.deletedAt} IS NOT NULL OR nullif(btrim(${table.body}), '') IS NOT NULL`,
     ),
   ],
 );

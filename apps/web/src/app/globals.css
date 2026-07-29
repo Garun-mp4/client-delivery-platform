@@ -1236,6 +1236,75 @@ button:disabled {
 .review-actions form:last-child {
   width: min(100%, 520px);
 }
+.timeline-list,
+.version-list,
+.feedback-list,
+.comment-thread {
+  display: grid;
+  gap: 1rem;
+  margin: 1.25rem 0;
+  padding: 0;
+  list-style: none;
+}
+.timeline-list > li {
+  padding-left: 1rem;
+  border-left: 2px solid var(--border-emphasis);
+}
+.timeline-list h3,
+.review-card h3 {
+  margin: 0.25rem 0 0.5rem;
+}
+.review-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border-default);
+  border-radius: 0.75rem;
+  background: var(--surface-inset);
+}
+.review-card > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.review-instructions {
+  display: grid;
+  gap: 0.35rem;
+}
+.review-instructions p {
+  margin: 0 0 0.75rem;
+}
+.secret-card {
+  margin: 1.25rem 0;
+  padding: 1rem;
+  border: 1px solid var(--border-default);
+  border-radius: 0.5rem;
+  background: var(--surface-inset);
+}
+.secret-card dt {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.secret-card dd {
+  margin: 0.35rem 0 0;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 1.05rem;
+}
+.comment-thread {
+  padding: 1rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 0.5rem;
+  background: var(--surface);
+}
+.comment-thread p {
+  margin: 0.25rem 0 0;
+}
+.pre-wrap {
+  white-space: pre-wrap;
+}
+
 @media (max-width: 900px) {
   .app-shell {
     display: block;

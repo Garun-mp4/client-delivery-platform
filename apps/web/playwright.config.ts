@@ -24,6 +24,7 @@ export default defineConfig({
         '**/materials.spec.ts',
         '**/projects.spec.ts',
         '**/questionnaires.spec.ts',
+        '**/review.spec.ts',
       ],
       use: { ...devices['Pixel 7'], channel: 'chrome' },
     },

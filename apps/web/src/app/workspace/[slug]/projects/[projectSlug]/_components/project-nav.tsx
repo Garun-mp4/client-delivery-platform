@@ -8,6 +8,7 @@ const sections = [
   { label: 'План', suffix: '/workflow' },
   { label: 'Анкеты', suffix: '/questionnaires' },
   { label: 'Материалы', suffix: '/materials' },
+  { label: 'Проверка', suffix: '/review' },
 ] as const;
 
 export function ProjectNav({
