@@ -10,11 +10,16 @@ import {
 import { resolveTenantContext, type TenantContext } from '@garun/core/identity';
 import {
   canAccessProject,
+  completeProjectCoverUpload,
   createClientCompany,
   createProject,
+  enqueueProjectCoverCapture,
   getClientProject,
   getInternalClientCompany,
+  getProjectCover,
+  initiateProjectCoverUpload,
   publishProject,
+  removeManualProjectCover,
   removeProjectMember,
   resolveProjectAccess,
   setProjectArchived,
@@ -26,7 +31,11 @@ import {
   invitation,
   outboxEvent,
   project,
+  projectCoverAsset,
+  projectCoverCapture,
   projectMembership,
+  fileObject,
+  siteVersion,
   user,
   workspace,
   workspaceMembership,
@@ -282,6 +291,88 @@ describe('clients, projects and explicit access grants', () => {
     });
     await publishProject(client, tenantA, second.slug);
     expect(await resolveProjectAccess(client.db, clientTenant, second.slug)).toBeNull();
+  });
+
+  it('keeps manual covers quarantined, tenant scoped and preferred for client reads', async () => {
+    const checksum = 'a'.repeat(64);
+    const upload = await initiateProjectCoverUpload(
+      client,
+      tenantA,
+      `site-a-${suffix}`,
+      {
+        name: 'cover.webp',
+        mimeType: 'image/webp',
+        size: 128,
+        checksum,
+        idempotencyKey: `cover-${suffix}`,
+      },
+      {
+        maxWorkspaceBytes: 10_737_418_240,
+        uploadExpiresAt: new Date(Date.now() + 60_000),
+      },
+    );
+    expect(await getProjectCover(client, tenantA, `site-a-${suffix}`)).toBeNull();
+    await completeProjectCoverUpload(client, tenantA, `site-a-${suffix}`, upload.id, {
+      size: 128,
+      mimeType: 'image/webp',
+      checksum,
+    });
+    await client.db
+      .update(fileObject)
+      .set({
+        uploadStatus: 'available',
+        scanStatus: 'clean',
+        detectedMimeType: 'image/webp',
+        previewStorageKey: `${upload.storageKey}.preview.webp`,
+        availableAt: new Date(),
+      })
+      .where(eq(fileObject.id, upload.id));
+    await client.db
+      .update(projectCoverAsset)
+      .set({ isCurrent: true })
+      .where(eq(projectCoverAsset.fileObjectId, upload.id));
+    const clientTenant = await resolveTenantContext(client.db, clientUserId, `project-a-${suffix}`);
+    if (!clientTenant) throw new Error('client tenant missing');
+    expect((await getProjectCover(client, clientTenant, `site-a-${suffix}`))?.kind).toBe('manual');
+    await expect(
+      removeManualProjectCover(client, clientTenant, `site-a-${suffix}`),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(getProjectCover(client, tenantB, `site-a-${suffix}`)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+
+    const [version] = await client.db
+      .insert(siteVersion)
+      .values({
+        workspaceId: workspaceAId,
+        projectId: projectAId,
+        name: 'Published cover source',
+        versionNumber: 1,
+        changeLog: 'Cover source',
+        checkInstructions: 'Open',
+        url: 'https://example.com/',
+        environmentType: 'production',
+        accessMode: 'public',
+        securityStatus: 'safe',
+        availabilityStatus: 'reachable',
+        clientVisible: true,
+        checkedAt: new Date(),
+        publishedAt: new Date(),
+        publishedByUserId: ownerAId,
+      })
+      .returning({ id: siteVersion.id });
+    const key = `manual-capture-${suffix}`;
+    expect(
+      await enqueueProjectCoverCapture(client, tenantA, `site-a-${suffix}`, key),
+    ).not.toBeNull();
+    expect(await enqueueProjectCoverCapture(client, tenantA, `site-a-${suffix}`, key)).toBeNull();
+    const jobs = await client.db
+      .select({ id: projectCoverCapture.id })
+      .from(projectCoverCapture)
+      .where(eq(projectCoverCapture.siteVersionId, version!.id));
+    expect(jobs).toHaveLength(1);
+    await removeManualProjectCover(client, tenantA, `site-a-${suffix}`);
+    expect(await getProjectCover(client, tenantA, `site-a-${suffix}`)).toBeNull();
   });
 
   it('does not duplicate memberships when the same user is invited again', async () => {

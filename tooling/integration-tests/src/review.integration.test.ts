@@ -16,6 +16,7 @@ import {
   clientCompany,
   clientMembership,
   project,
+  projectCoverCapture,
   projectMembership,
   siteVersion,
   user,
@@ -167,6 +168,11 @@ describe('Milestone 07 review loop', () => {
       .where(eq(siteVersion.id, first.id));
     await publishSiteVersion(database, ownerTenant, projectSlug, first.id, false);
     await publishSiteVersion(database, ownerTenant, projectSlug, first.id, false);
+    const captures = await database.db
+      .select({ id: projectCoverCapture.id })
+      .from(projectCoverCapture)
+      .where(eq(projectCoverCapture.siteVersionId, first.id));
+    expect(captures).toHaveLength(1);
     await database.db
       .update(siteVersion)
       .set({ checkedAt: new Date(Date.now() - 11 * 60 * 1_000) })

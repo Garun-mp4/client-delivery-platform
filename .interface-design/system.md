@@ -65,6 +65,9 @@ tight tracking and balanced wrapping. Data uses tabular numerals.
 - `PageHeader`: location, clear title, short purpose and optional one primary action.
 - `ProjectNav`: project-local sections, current location.
 - `ProjectRoute`: responsibility and next-action narrative.
+- `ProjectDossierCard`: 16:10 result cover, company/status, stage/progress, compact `ProjectRoute`,
+  deadline/activity and a separate non-nested action menu. Manual cover → automatic cover → dashed
+  fallback is a semantic state, not decoration.
 - `ActionPanel`: one dominant CTA, context and expected result.
 - `EmptyState`: why empty, what happens next, one relevant action.
 - `FormSection`: purpose before fields, inline errors, pending submit.

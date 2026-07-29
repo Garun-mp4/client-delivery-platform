@@ -8,6 +8,7 @@ import { createLogger, getOrCreateRequestId } from '@garun/observability';
 import { ClamAvScanner, S3ObjectStorage } from '@garun/storage';
 
 import { createWorkerHealthResponse } from './health';
+import { startCoverCaptureProcessor } from './cover-captures';
 import { startFileProcessor } from './files';
 import { startOutboxDispatcher } from './outbox';
 import { startUrlChecker } from './url-checks';
@@ -22,6 +23,7 @@ const database = createDatabaseClient(environment.DATABASE_URL);
 const stopOutbox = startOutboxDispatcher(database.pool, environment, logger);
 const stopFiles = startFileProcessor(database.pool, environment, logger);
 const stopUrlChecks = startUrlChecker(database.pool, environment.PUBLIC_APP_URL, logger);
+const stopCoverCaptures = startCoverCaptureProcessor(database.pool, environment, logger);
 
 function sendJson(response: ServerResponse, statusCode: number, body: unknown, requestId: string) {
   response.writeHead(statusCode, {
@@ -105,6 +107,7 @@ function shutdown(signal: NodeJS.Signals) {
   stopOutbox();
   stopFiles();
   stopUrlChecks();
+  stopCoverCaptures();
   server.close((error) => {
     if (error) {
       logger.error({ errorCode: 'WORKER_SHUTDOWN_FAILED' }, 'Worker shutdown failed');

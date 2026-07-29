@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation';
 import { isOwner } from '@garun/core/identity';
 import {
   canAccessProject,
+  getLatestProjectCoverCapture,
+  getProjectCover,
   getClientProject,
   getInternalProject,
   listActiveClientCompanies,
@@ -13,9 +15,11 @@ import {
   resolveProjectAccess,
 } from '@garun/core/projects';
 import { getProjectWorkflow } from '@garun/core/workflow';
+import { withDatabaseReadRetry } from '@garun/db';
 
 import { ProjectNav } from './_components/project-nav';
 import { ProjectRoute } from './_components/project-route';
+import { CoverManager } from './_components/cover-manager';
 import { projectStatusLabels, projectTypeLabels } from '../project-copy';
 import { SubmitButton } from '@/app/_components/submit-button';
 import { requireTenantPage } from '@/lib/page-tenant';
@@ -99,13 +103,12 @@ function ClientProjectView({
   );
 }
 
-export default async function ProjectPage({
-  params,
-  searchParams,
-}: {
+interface ProjectPageProps {
   params: Promise<{ slug: string; projectSlug: string }>;
   searchParams: Promise<{ preview?: string; success?: string; error?: string }>;
-}) {
+}
+
+async function renderProjectPage({ params, searchParams }: ProjectPageProps) {
   const [{ slug, projectSlug }, feedback] = await Promise.all([params, searchParams]);
   const { tenant } = await requireTenantPage(slug);
   const access = await resolveProjectAccess(database.db, tenant, projectSlug);
@@ -128,14 +131,17 @@ export default async function ProjectPage({
       />
     );
   }
-  const [item, companies, workspaceMembers, members, invitations, workflow] = await Promise.all([
-    getInternalProject(database.db, tenant, projectSlug),
-    listActiveClientCompanies(database.db, tenant),
-    listInternalWorkspaceMembers(database.db, tenant),
-    listProjectMembers(database.db, tenant, projectSlug),
-    listProjectInvitations(database.db, tenant, projectSlug),
-    getProjectWorkflow(database.db, tenant, projectSlug),
-  ]);
+  const [item, companies, workspaceMembers, members, invitations, workflow, cover, capture] =
+    await Promise.all([
+      getInternalProject(database.db, tenant, projectSlug),
+      listActiveClientCompanies(database.db, tenant),
+      listInternalWorkspaceMembers(database.db, tenant),
+      listProjectMembers(database.db, tenant, projectSlug),
+      listProjectInvitations(database.db, tenant, projectSlug),
+      getProjectWorkflow(database.db, tenant, projectSlug),
+      getProjectCover(database, tenant, projectSlug),
+      getLatestProjectCoverCapture(database, tenant, projectSlug).catch(() => null),
+    ]);
   if (!item) notFound();
   const archived = item.status === 'archived';
   const memberUserIds = new Set(members.map((member) => member.userId));
@@ -199,6 +205,17 @@ export default async function ProjectPage({
         }
         status={projectStatusLabels[item.status]}
       />
+      {canAccessProject(access, 'project.edit') ? (
+        <CoverManager
+          captureStatus={capture?.status ?? null}
+          captureUrl={`/api/workspaces/${slug}/projects/${projectSlug}/cover/capture`}
+          coverUrl={`/api/workspaces/${slug}/projects/${projectSlug}/cover`}
+          disabled={archived}
+          hasCover={Boolean(cover)}
+          hasManualCover={cover?.kind === 'manual'}
+          uploadUrl={`/api/workspaces/${slug}/projects/${projectSlug}/cover/uploads`}
+        />
+      ) : null}
       <details className="panel disclosure-panel">
         <summary>
           <span className="disclosure-title">
@@ -466,4 +483,8 @@ export default async function ProjectPage({
       </details>
     </main>
   );
+}
+
+export default function ProjectPage(props: ProjectPageProps) {
+  return withDatabaseReadRetry(() => renderProjectPage(props));
 }

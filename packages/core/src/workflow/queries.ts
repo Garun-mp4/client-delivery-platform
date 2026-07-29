@@ -8,7 +8,9 @@ import {
   projectMembership,
   projectScopeRevision,
   projectStage,
+  projectUpdate,
   scopeRevisionApprover,
+  siteVersion,
   user,
 } from '@garun/db/schema';
 
@@ -228,6 +230,139 @@ export async function listWorkspaceWorkflowOverview(
           ? 0
           : Math.round((item.progressCompletedWeight / item.progressTotalWeight) * 100),
       blockingAction,
+    };
+  });
+}
+
+export async function listProjectCatalogWorkflow(
+  database: DatabaseClient['db'],
+  tenant: TenantContext,
+  catalogProjects: readonly {
+    readonly id: string;
+    readonly side: 'internal' | 'client' | null;
+  }[],
+) {
+  if (catalogProjects.length === 0) return [];
+  const ids = catalogProjects.map((item) => item.id);
+  const sideByProject = new Map(catalogProjects.map((item) => [item.id, item.side]));
+  const [projects, stages, actions, updates, versions] = await Promise.all([
+    database
+      .select({
+        id: project.id,
+        completed: project.progressCompletedWeight,
+        total: project.progressTotalWeight,
+      })
+      .from(project)
+      .where(and(eq(project.workspaceId, tenant.workspaceId), inArray(project.id, ids))),
+    database
+      .select({
+        projectId: projectStage.projectId,
+        name: projectStage.name,
+        status: projectStage.status,
+        clientVisible: projectStage.clientVisible,
+        orderIndex: projectStage.orderIndex,
+        updatedAt: projectStage.updatedAt,
+      })
+      .from(projectStage)
+      .where(
+        and(eq(projectStage.workspaceId, tenant.workspaceId), inArray(projectStage.projectId, ids)),
+      ),
+    database
+      .select({
+        projectId: actionItem.projectId,
+        id: actionItem.id,
+        title: actionItem.title,
+        description: actionItem.description,
+        assigneeUserId: actionItem.assigneeUserId,
+        visibility: actionItem.visibility,
+        priority: actionItem.priority,
+        dueAt: actionItem.dueAt,
+        isBlocking: actionItem.isBlocking,
+        status: actionItem.status,
+        updatedAt: actionItem.updatedAt,
+        createdAt: actionItem.createdAt,
+      })
+      .from(actionItem)
+      .where(
+        and(
+          eq(actionItem.workspaceId, tenant.workspaceId),
+          inArray(actionItem.projectId, ids),
+          inArray(actionItem.status, ['open', 'in_progress']),
+        ),
+      ),
+    database
+      .select({
+        projectId: projectUpdate.projectId,
+        visibility: projectUpdate.visibility,
+        publishedAt: projectUpdate.publishedAt,
+        updatedAt: projectUpdate.updatedAt,
+      })
+      .from(projectUpdate)
+      .where(
+        and(
+          eq(projectUpdate.workspaceId, tenant.workspaceId),
+          inArray(projectUpdate.projectId, ids),
+        ),
+      ),
+    database
+      .select({
+        projectId: siteVersion.projectId,
+        clientVisible: siteVersion.clientVisible,
+        updatedAt: siteVersion.updatedAt,
+      })
+      .from(siteVersion)
+      .where(
+        and(eq(siteVersion.workspaceId, tenant.workspaceId), inArray(siteVersion.projectId, ids)),
+      ),
+  ]);
+  const activeStageStatuses = new Set([
+    'in_progress',
+    'waiting_for_client',
+    'ready_for_review',
+    'changes_requested',
+  ]);
+  return projects.map((item) => {
+    const internal = isOwner(tenant) || sideByProject.get(item.id) === 'internal';
+    const projectStages = stages
+      .filter((stage) => stage.projectId === item.id && (internal || stage.clientVisible))
+      .sort((left, right) => left.orderIndex - right.orderIndex);
+    const currentStage =
+      projectStages.find((stage) => activeStageStatuses.has(stage.status)) ??
+      projectStages.find((stage) => stage.status === 'not_started') ??
+      projectStages.at(-1) ??
+      null;
+    const projectActions = actions
+      .filter(
+        (action) =>
+          action.projectId === item.id &&
+          (internal || (action.visibility === 'client' && action.assigneeUserId === tenant.userId)),
+      )
+      .sort((left, right) => compareActions(left, right));
+    const nextAction = projectActions[0] ?? null;
+    const blockingAction =
+      projectActions.find((action) => action.isBlocking && action.visibility === 'client') ?? null;
+    const lastActivityAt =
+      [
+        ...projectStages.map((stage) => stage.updatedAt),
+        ...projectActions.map((action) => action.updatedAt),
+        ...updates
+          .filter(
+            (update) =>
+              update.projectId === item.id &&
+              (internal || (update.visibility === 'client' && update.publishedAt)),
+          )
+          .map((update) => update.updatedAt),
+        ...versions
+          .filter((version) => version.projectId === item.id && (internal || version.clientVisible))
+          .map((version) => version.updatedAt),
+      ].sort((left, right) => right.getTime() - left.getTime())[0] ?? null;
+    return {
+      projectId: item.id,
+      progressPercent: item.total === 0 ? 0 : Math.round((item.completed / item.total) * 100),
+      currentStage,
+      nextAction,
+      blockingAction,
+      lastActivityAt,
     };
   });
 }

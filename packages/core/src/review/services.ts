@@ -8,6 +8,7 @@ import {
   fileObject,
   outboxEvent,
   project,
+  projectCoverCapture,
   projectUpdate,
   siteVersion,
 } from '@garun/db/schema';
@@ -219,6 +220,18 @@ export async function publishSiteVersion(
       .values(
         domainEvent(tenant.workspaceId, allowed.projectId, 'site_version.published', version.id),
       );
+    if (version.accessMode === 'public' && version.availabilityStatus === 'reachable') {
+      await tx
+        .insert(projectCoverCapture)
+        .values({
+          workspaceId: tenant.workspaceId,
+          projectId: allowed.projectId,
+          siteVersionId: version.id,
+          requestedByUserId: tenant.userId,
+          idempotencyKey: `publish:${version.id}`,
+        })
+        .onConflictDoNothing();
+    }
     return version;
   });
   if (!result) throw new ReviewServiceError('INVALID_STATE');

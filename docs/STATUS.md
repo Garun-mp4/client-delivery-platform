@@ -1,13 +1,12 @@
 # Статус реализации
 
 Последнее обновление: 2026-07-29
-Общий статус: Milestones 00–07 и UX stabilization Milestone 06.5 завершены
+Общий статус: Milestones 00–07.5 и UX stabilization 06.5 завершены
 
 ## Текущий milestone
 
-**Milestone 07 — обновления, версии сайта и review loop — завершён и объединён в `main`.**
-Milestone 06, UX stabilization 06.5 и Milestone 07 последовательно объединены без конфликтов.
-Milestone 08 не начат.
+**Milestone 07.5 — каталог проектов и обложки — завершён в
+`feat/milestone-07-5-project-catalog`.** Milestone 08 не начат.
 
 ## Завершённые задачи
 
@@ -34,6 +33,16 @@ Milestone 08 не начат.
 - Исправлена конкуренция Better Auth rate limit: публичный magic-link остаётся 5/min, внутреннее
   создание session после уже валидного invitation имеет отдельный защищённый лимит.
 - Созданы миграции `0012`–`0014`, ADR-040–041 и `docs/REVIEW_LOOP.md`; README обновлён.
+- Каталог проектов переработан в server-rendered карточный/компактный обзор с поиском, фильтрами,
+  сортировкой, URL-state и пагинацией по 24 проекта без per-card N+1.
+- Добавлены отдельная страница создания проекта, role-specific workflow projection и карточка со
+  стадией, прогрессом, ответственностью, следующим результатом, сроком и активностью.
+- Реализованы private manual/automatic project covers, quarantine activation, Sharp WebP,
+  same-origin delivery, capture queue и SSRF-safe Chromium renderer adapter.
+- Управление обложкой разделено на понятные сценарии: доступная с клавиатуры dropzone с
+  drag-and-drop, проверкой типа/размера и состоянием выбранного файла; автоматический снимок и
+  удаление ручной обложки вынесены в отдельные аккуратные действия с русскими статусами.
+- Добавлена migration `0015`, ADR-043, cover permissions/ER и документация renderer flow.
 
 ## Текущие задачи
 
@@ -66,6 +75,18 @@ Milestone 08 не начат.
   повторная сборка с тем же lockfile и cache прошла. Первый integration run сразу после тяжёлой
   сборки исчерпал 10-секундный setup timeout; повторный прогон на прогретой БД прошёл 29/29 без
   изменения тестов или timeout.
+- Первый E2E Milestone 07.5 выявил, что production CSP не включал локальный default storage origin,
+  если он применялся runtime validator, а не был явно записан в `.env`. Локальный/test allowlist
+  теперь использует тот же безопасный `127.0.0.1:9000`; тест проверяет точный `connect-src`.
+- Первый PNG fixture имел libpng read error при полном Sharp decode, хотя header metadata читалась.
+  Fixture заменена реальным Sharp-generated PNG; cover upload проверяет полный scanner/preview flow.
+- Docker Desktop запрещает namespace sandbox non-root Chromium. Выдача `SYS_ADMIN` отклонена;
+  локально browser остаётся non-root в container boundary и без прямой сети, а production hardened
+  sandbox зафиксирован обязательным deployment review.
+- После успешной постановки cover capture Docker DNS один раз вернул web-контейнеру
+  `getaddrinfo EAI_AGAIN postgres`. Capture завершился и данные не пострадали, но read projection
+  показал dev error overlay. ADR-044 добавляет узкий retry только для идемпотентного чтения страницы;
+  SQL/domain errors и mutations не повторяются.
 
 ## Принятые решения
 
@@ -79,6 +100,10 @@ Milestone 08 не начат.
   добавлялись.
 - ADR-042: runtime advisories исправляются обновлением Next.js/Sharp; единственное исключение audit
   ограничено dev-only ESLint advisory и документировано до совместимого upstream-обновления.
+- ADR-043: project covers приватны; приоритет manual → automatic → empty; renderer является
+  adapter и загружает каждый browser resource только через SSRF-safe IP-pinned transport.
+- ADR-044: временные DB connection errors повторяются только на границе цельного read-only server
+  render; mutation retry по умолчанию запрещён.
 
 ## Выполненные проверки
 
@@ -102,11 +127,27 @@ Milestone 08 не начат.
   typecheck, migration drift/apply, unit, integration, build, artifact, browser/a11y и smoke зелёные.
 - `git diff --check`, tracked env/artifact scan, high-confidence secret scan, type-suppression scan и
   Compose error/secret log scan — успешно.
+- Milestone 07.5: frozen install, format, lint, strict typecheck и unit suites успешны; core 41/41,
+  worker 19/19, web 14/14.
+- Migration `0015` применена вместе с `0000`–`0014` на чистой `garun_m075_verify`; 16 migration
+  records, повторный `db:generate` — `No schema changes`.
+- Integration 30/30; production web/worker build и artifact verification успешны.
+- Полный Playwright E2E/a11y 20/20; manual cover прошёл upload → quarantine → activation → private
+  read → delete, а automatic capture `example.com` завершился за одну попытку и создал result asset.
+- Compose rebuild/healthchecks и web/worker smoke успешны. `pnpm audit --prod` не нашёл runtime
+  advisory; один документированный high dev-only ESLint advisory игнорируется по ADR-042.
+- Regression после временного Docker DNS failure: новый unit suite для read retry 2/2, повторные
+  format/lint/typecheck/unit/integration/build/artifact проверки, project E2E 1/1, Compose
+  healthchecks и smoke успешны; свежие логи не содержат повторного `EAI_AGAIN` или чувствительных
+  значений.
+- UX review cover manager: format/lint/strict typecheck/unit/build успешны; project E2E 1/1
+  подтверждает выбор файла, quarantine upload и axe без нарушений. Desktop 1440 px и mobile 390 px
+  проверены по реальному server-rendered экрану после Compose rebuild.
 
 ## Следующие действия
 
-1. Дождаться успешного CI объединённого `main`.
-2. После отдельного подтверждения создать ветку Milestone 08 — общие согласования и audit trail.
+1. Провести review/merge ветки Milestone 07.5.
+2. После отдельного подтверждения перейти к Milestone 08.
 
 ## Известные ограничения
 
@@ -114,8 +155,10 @@ Milestone 08 не начат.
   единственным гарантированным путем. Capability result хранится для будущего безопасного UX.
 - URL checker использует консервативный HTTP `HEAD`; protected preview может быть
   `safe/unreachable` и требует ручного подтверждения, но unsafe security result не переопределяется.
-- Screenshot создаётся через существующий файловый контур; автоматический browser screenshot, DOM
-  locator/overlay, SDK, console capture и real-time не входят в Milestone 07.
+- Автоматический project cover реализован только для public safe/reachable SiteVersion; protected
+  preview, периодическое переснимание, crop/gallery, DOM locator/overlay, SDK и real-time не входят.
+- Локальный worker image включает Chromium и поэтому стал заметно тяжелее; production provider и
+  окончательный worker image остаются предварительными.
 - `potential_change` — только явная классификация. Полноценный change request и коммерческое решение
   относятся к последующим milestones.
 - Production domain, R2, scanner deployment, RUM/APM и credentials не создавались.

@@ -164,6 +164,23 @@ const workerSchema = z
     ...scannerShape,
     WORKER_HOST: z.string().trim().min(1).default('127.0.0.1'),
     WORKER_PORT: z.coerce.number().int().min(1).max(65_535).default(3001),
+    COVER_BROWSER_EXECUTABLE_PATH: z
+      .string()
+      .trim()
+      .min(1)
+      .default(
+        process.platform === 'win32'
+          ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+          : '/usr/bin/chromium',
+      ),
+    COVER_CAPTURE_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(60_000).default(20_000),
+    COVER_CAPTURE_MAX_REQUESTS: z.coerce.number().int().min(10).max(200).default(80),
+    COVER_CAPTURE_MAX_BYTES: z.coerce
+      .number()
+      .int()
+      .min(1_048_576)
+      .max(52_428_800)
+      .default(20_971_520),
   })
   .superRefine((value, context) => {
     validateProductConfig(value, context);

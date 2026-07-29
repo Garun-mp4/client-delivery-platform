@@ -10,6 +10,45 @@ export interface DatabaseClient {
   readonly pool: Pool;
 }
 
+const transientReadErrorCodes = new Set([
+  'EAI_AGAIN',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ETIMEDOUT',
+  '57P01',
+  '57P02',
+  '57P03',
+]);
+
+function findErrorCode(error: unknown): string | null {
+  let current = error;
+  for (let depth = 0; depth < 5; depth += 1) {
+    if (!current || typeof current !== 'object') return null;
+    const value = current as { readonly code?: unknown; readonly cause?: unknown };
+    if (typeof value.code === 'string') return value.code;
+    current = value.cause;
+  }
+  return null;
+}
+
+export async function withDatabaseReadRetry<T>(
+  operation: () => Promise<T>,
+  options: { readonly delaysMs?: readonly number[] } = {},
+): Promise<T> {
+  const delays = options.delaysMs ?? [100, 300];
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      const delay = delays[attempt];
+      if (delay === undefined || !transientReadErrorCodes.has(findErrorCode(error) ?? '')) {
+        throw error;
+      }
+      if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+}
+
 export function createDatabaseClient(
   databaseUrl = parseDatabaseEnv().DATABASE_URL,
 ): DatabaseClient {

@@ -1,4 +1,4 @@
-# Клиенты, проекты и доступ Milestone 03
+# Клиенты, проекты, каталог и доступ
 
 ## Поток владельца
 
@@ -25,6 +25,10 @@
 | Изменять клиентское содержимое |   —   |              —              | вне Milestone 03 |     нет     |
 | Видеть черновик                |  да   |   явный внутренний grant    |       нет        |     нет     |
 | Изменять архив                 |  нет  |             нет             |       нет        |     нет     |
+| Читать доступную обложку       |  да   |         явный grant         |   явный grant    | явный grant |
+| Загружать/удалять обложку      |  да   |       `project.edit`        |       нет        |     нет     |
+| Запустить новый автоснимок     |  да   |       `project.edit`        |       нет        |     нет     |
+| Читать диагностику автоснимка  |  да   |             нет             |       нет        |     нет     |
 
 Неизвестное разрешение запрещено. UI не является границей безопасности: те же проверки выполняются
 в application services и tenant-scoped queries.
@@ -57,10 +61,29 @@ erDiagram
   CLIENT_COMPANY ||--o{ CLIENT_INVITATION_CONTEXT : targets
   INVITATION ||--o{ INVITATION_PROJECT_GRANT : carries
   PROJECT ||--o{ INVITATION_PROJECT_GRANT : targets
+  PROJECT ||--o{ PROJECT_COVER_ASSET : has
+  FILE_OBJECT ||--o| PROJECT_COVER_ASSET : stores
+  SITE_VERSION ||--o{ PROJECT_COVER_CAPTURE : triggers
+  PROJECT ||--o{ PROJECT_COVER_CAPTURE : queues
+  PROJECT_COVER_CAPTURE ||--o| PROJECT_COVER_ASSET : produces
 ```
 
 `Project.statusBeforeArchive` допустим только при `status = archived`. Плановая дата завершения не
 может быть раньше даты начала. Сочетания membership side/role ограничены database checks.
+`ProjectCoverAsset` и `ProjectCoverCapture` связаны с workspace/project composite keys: файл или
+версию другого tenant/project присоединить невозможно.
+
+## Каталог и обложки
+
+- Каталог вычисляется на сервере и хранит поиск, фильтр, сортировку, страницу и вид в URL.
+- Карточный вид показывает обложку, текущий этап, прогресс, срок, последнюю значимую активность и
+  следующий маршрут. Компактный вид сохраняет те же ключевые данные для больших списков.
+- Внутренние участники получают internal workflow только при явном project membership; client DTO
+  исключает internal stages, actions, updates и диагностические failure codes.
+- Приоритет обложки неизменен: clean manual, затем succeeded automatic, затем dashed fallback.
+- Новая manual upload не заменяет текущую до scanner/Sharp activation. Удаление manual автоматически
+  раскрывает доступный automatic asset.
+- Изображение выдаётся только приватным same-origin endpoint после повторной project policy.
 
 ## Проверяемые гарантии
 
@@ -74,5 +97,4 @@ erDiagram
 - архив read-only, отзыв доступа действует сразу;
 - critical flow и mobile accessibility проверяются Playwright.
 
-Этапы, scope, действия, анкеты, файлы, версии и оплаты намеренно отсутствуют до следующих
-milestones.
+Оплаты и согласования общего назначения остаются границами следующих milestones.

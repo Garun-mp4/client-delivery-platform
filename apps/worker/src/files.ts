@@ -146,6 +146,33 @@ async function markAvailable(
         result.previewStorageKey,
       ],
     );
+    await connection.query(
+      `with incoming as (
+           select id, workspace_id, project_id, kind
+           from project_cover_asset
+           where file_object_id = $1 and kind = 'manual' and is_current = false
+       ), superseded as (
+         update project_cover_asset current
+         set is_current = false, superseded_at = now(), updated_at = now()
+         from incoming
+         where current.project_id = incoming.project_id
+           and current.workspace_id = incoming.workspace_id
+           and current.kind = incoming.kind
+           and current.is_current = true
+         ), activated as (
+           update project_cover_asset asset
+           set is_current = true, superseded_at = null, updated_at = now()
+           from incoming
+           where asset.id = incoming.id
+           returning asset.id, asset.workspace_id, asset.project_id
+         )
+         insert into audit_event
+           (workspace_id, action, entity_type, entity_id, metadata)
+         select workspace_id, 'project_cover.activated', 'project_cover_asset', id,
+           jsonb_build_object('projectId', project_id::text, 'source', 'file_processor')
+         from activated`,
+      [file.id],
+    );
     await completeRevision(connection, file.id);
     await connection.query('commit');
   } catch (error) {

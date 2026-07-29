@@ -257,6 +257,56 @@ landing, public SaaS onboarding и визуальные изменения бе�
 
 **Не входит.** DOM locator, marker overlay, automated screenshot browsing, real-time, console capture и change-request proposal.
 
+## 10.5. Milestone 07.5 — каталог проектов и обложки
+
+**Цель.** Превратить каталог проектов в быстрый рабочий обзор: состояние, ответственность,
+следующее действие, ближайший срок и визуальный контекст результата читаются без открытия проекта.
+
+**Функции.** Русскоязычный каталог с карточным и компактным видами; server-side поиск, фильтры,
+сортировка и пагинация по 24 элемента с состоянием в URL; отдельная страница создания; карточка с
+этапом, прогрессом, сроком, активностью и `ProjectRoute`. Обложка выбирается строго
+`manual clean → automatic succeeded → dashed empty`. Ручная загрузка до 10 MiB использует
+quarantine/scanner/Sharp. После публикации последней client-visible public safe/reachable
+`SiteVersion` создаётся идемпотентное задание автоматического снимка; прежняя обложка сохраняется до
+успеха новой.
+
+**Модули и файлы.** `projects/covers`, project catalog queries и DTO; private same-origin cover
+endpoints; file/capture worker; заменяемый `ProjectCoverRenderer`; project catalog/create/cover
+screens; storage и URL-security adapters.
+
+**База данных.** Tenant-scoped `project_cover_asset` и `project_cover_capture`; composite foreign
+keys по workspace/project; partial unique current asset по виду; idempotency key задания; status,
+attempts/backoff, safe failure code и result reference. Migration `0015`.
+
+**Безопасность.** Все чтения начинаются с session, membership и project policy; клиент видит
+результат, но не может менять обложку. Private object URL не раскрывается. Renderer работает
+non-root в отдельном Chromium context без credentials; каждый document/redirect/subresource
+перехватывается и загружается SSRF-safe transport с повторной DNS/IP-проверкой и pinning. Блокируются
+private/special IP, нестандартные схемы, WebSocket, service worker, downloads, QUIC и прямой DNS;
+действуют лимиты времени, запросов и байтов. Docker Desktop не разрешает namespace sandbox non-root
+Chromium без опасного `SYS_ADMIN`, поэтому локально используется container boundary; production
+runtime обязан предоставить отдельный hardened sandbox. URL, изображение и токены не логируются.
+
+**Тесты.** Unit приоритета/валидации/state machine/URL rules; integration upload → quarantine →
+activation, replacement/removal, idempotent capture enqueue, tenant/role/IDOR; E2E отдельного
+создания, видов/URL-фильтров, fallback и accessibility. Проверка отсутствия N+1 выполняется
+пакетными catalog projections.
+
+**Команды проверки.** Полный standard quality gate; `pnpm db:generate`, migration на чистой БД,
+`pnpm test:integration`, `pnpm test:security`, `pnpm build`, `pnpm verify:artifacts`,
+`pnpm test:e2e`, `pnpm test:a11y`, `pnpm smoke`, Docker healthchecks, audit и secret scan.
+
+**Критерии приёмки.** Каталог сохраняет параметры в URL и показывает не более 24 проектов; клиентский
+DTO не содержит internal workflow. Pending/rejected manual asset не заменяет текущий. Удаление manual
+раскрывает automatic. Только безопасная публичная версия создаёт ровно один capture job; retry или
+ошибка сохраняют предыдущую обложку. Все cover endpoints проходят cross-tenant/IDOR policies,
+объекты выдаются только через авторизованный same-origin endpoint.
+
+**Зависимости.** Milestone 07. Milestone 08 начинается только после завершения этого milestone.
+
+**Не входит.** Произвольный project URL, сайт компании клиента, периодическое переснимание, внешний
+screenshot SaaS, client upload, публичные object URLs, crop editor, gallery и согласования.
+
 ## 11. Milestone 08 — согласования и audit trail
 
 **Цель.** Неизменяемо подтвердить конкретный scope/stage/version/file/final handover с правильной authority и конкурентностью.
@@ -275,7 +325,7 @@ landing, public SaaS onboarding и визуальные изменения бе�
 
 **Критерии приёмки.** В `any_one` первое допустимое решение завершает request; в `all_required` ожидаются все назначенные пользователи. Повторный/конкурентный запрос не создаёт второе решение; решение содержит точную revision и snapshot настраиваемого нейтрального текста; owner не может принять его за клиента; `recorded_externally` явно показывает автора фиксации и источник; новая обязательная revision инвалидирует старое pending решение; история не раскрывает internal event.
 
-**Зависимости.** Milestone 07.
+**Зависимости.** Milestone 07.5.
 
 **Не входит.** Юридическая ЭП, автоматическое согласование по сроку, payments gate и external approval integrations.
 

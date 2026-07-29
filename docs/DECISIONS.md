@@ -469,6 +469,51 @@ production artifact. Исключение ограничено одним GHSA �
 несовместим с используемым официальным React plugin. Точечное документированное исключение не
 скрывает runtime advisories и сохраняет рабочие обязательные проверки.
 
+### ADR-043. Приватные project covers и SSRF-safe browser renderer
+
+**Решение:** каталог использует единый вычисленный источник обложки:
+последняя clean/available ручная обложка, затем последний успешный автоматический снимок, затем
+пустая область с dashed border. Объекты остаются приватными и читаются только через same-origin
+endpoint после session, tenant и project policy. Новая ручная загрузка активируется лишь после
+существующего quarantine/ClamAV/Sharp-контура; предыдущая обложка до этого не меняется.
+
+Автоматический снимок разрешён только для последней опубликованной client-visible public
+`SiteVersion` со свежими `safe/reachable` статусами. Задание идемпотентно и выполняется существующим
+worker. `ProjectCoverRenderer` является adapter; локальная реализация использует закреплённый
+`playwright-core@1.61.1` и Chromium из worker image. Browser context не получает cookies, пароли или
+credentials. Его document, redirect и subresource запросы не выходят в сеть напрямую: route
+fulfillment использует существующий DNS/IP validation и IP-pinned transport. Chromium запускается
+non-root с заблокированными service worker/WebSocket/download/QUIC/direct DNS и лимитами времени,
+запросов и общего объёма. Docker Desktop блокирует namespace sandbox non-root Chromium; вместо
+выдачи контейнеру опасного `SYS_ADMIN` локальный adapter полагается на container boundary и
+перехваченный network. Production worker должен запускаться в отдельном hardened browser sandbox
+runtime. В логах допустимы только workspace/project/job ID и безопасный failure code.
+
+**Альтернативы:** публичные object URLs; screenshot SaaS; прямой browser network после проверки
+главного URL; периодический cron; хранение только одного asset; синхронный capture в web request;
+ручной upload со стороны клиента.
+
+**Причина:** private delivery и повторная policy-проверка сохраняют tenant isolation. Перехват
+каждого browser request закрывает redirect/subresource SSRF и DNS rebinding. Adapter позволяет
+сменить renderer, а локальный Chromium исключает платный provider. `playwright-core` — единственная
+новая production-зависимость: без browser engine нельзя получить реальный first-viewport render
+современного сайта; Sharp и storage уже присутствуют.
+
+### ADR-044. Ограниченный retry только для идемпотентного server-side чтения
+
+**Решение:** server rendering страницы проекта может повторить весь read-only projection после
+узкого набора временных connection errors (`EAI_AGAIN`, reset/refused/timeout и PostgreSQL restart
+codes). Используются две короткие задержки. Классификатор проходит по вложенному `cause`, поскольку
+Drizzle оборачивает исходную ошибку драйвера. Domain mutations, transactions и неизвестные SQL-коды
+автоматически не повторяются.
+
+**Альтернативы:** показывать error boundary при единичном Docker DNS сбое; retry каждого repository
+метода; глобально повторять любые запросы; выдавать контейнеру статический IP PostgreSQL.
+
+**Причина:** Docker service DNS может кратковременно вернуть `EAI_AGAIN`, хотя PostgreSQL остаётся
+healthy. Повтор безопасен для цельной read projection, но общий retry mutation мог бы продублировать
+бизнес-операцию, audit или outbox event. Статический IP ломает переносимость Compose/SaaS-схемы.
+
 ## 5. Планируемая структура репозитория
 
 Каталоги создаются по мере появления рабочего кода, а не пустым scaffold заранее.
