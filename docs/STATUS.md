@@ -1,12 +1,12 @@
 # Статус реализации
 
 Последнее обновление: 2026-07-29
-Общий статус: Milestones 00–07.5 и UX stabilization 06.5 завершены
+Общий статус: Milestones 00–08 и UX stabilization 06.5 завершены
 
 ## Текущий milestone
 
-**Milestone 07.5 — каталог проектов и обложки — завершён в
-`feat/milestone-07-5-project-catalog`.** Milestone 08 не начат.
+**Milestone 08 — согласования и audit trail — завершён в
+`feat/milestone-08-approvals-audit`.** Следующий milestone — 09; его реализация не начиналась.
 
 ## Завершённые задачи
 
@@ -43,11 +43,21 @@
   drag-and-drop, проверкой типа/размера и состоянием выбранного файла; автоматический снимок и
   удаление ручной обложки вынесены в отдельные аккуратные действия с русскими статусами.
 - Добавлена migration `0015`, ADR-043, cover permissions/ER и документация renderer flow.
+- Добавлен общий approval workflow для scope/stage/site version/project-visible file/final
+  handover: immutable snapshot/checksum, явные approvers, `any_one`/`all_required`.
+- Решение выполняется назначенным client approver в serializable/idempotent transaction; owner
+  может только отменить request или записать отдельный `recorded_externally`.
+- Stage/scope outcome, progress, audit и outbox изменяются атомарно; blocking feedback и stale
+  entity revision блокируются, новая revision инвалидирует pending request.
+- Добавлены client-safe approvals/activity UI, HMAC network fingerprint без raw IP, migration
+  `0016`, ADR-045 и `docs/APPROVALS_AND_AUDIT.md`.
+- Старый экран scope также требует явного подтверждения ознакомления; клиентская activity
+  ограничена только назначенными этому пользователю requests и не раскрывает чужие события.
 
 ## Текущие задачи
 
-- Активной реализации нет.
-- Milestone 08 не начинать без отдельного подтверждения.
+- Нет активных задач Milestone 08.
+- Перед Milestone 09 требуется обычный review/merge текущей feature-ветки.
 
 ## Найденные проблемы
 
@@ -87,6 +97,24 @@
   `getaddrinfo EAI_AGAIN postgres`. Capture завершился и данные не пострадали, но read projection
   показал dev error overlay. ADR-044 добавляет узкий retry только для идемпотентного чтения страницы;
   SQL/domain errors и mutations не повторяются.
+- Первый generate Milestone 08 без `DATABASE_URL` ожидаемо завершился validation error; повтор с
+  явным local URL создал migration.
+- Drizzle сгенерировал composite FK раньше supporting unique indexes. Migration `0016` вручную
+  переупорядочена и успешно применена на чистой PostgreSQL 17; повторный generate подтвердил
+  отсутствие schema drift.
+- Первый integration run был запущен после неуспешной migration и без полного набора service env,
+  поэтому таблицы/MinIO variables отсутствовали. После исправления migration и окружения полный
+  прогон прошёл 34/34. При параллельном cold setup 10-секундный hook timeout оказался недостаточен;
+  setup-only лимит поднят до 30 секунд, test timeout не ослаблялся.
+- Первый финальный integration run был запущен в новой PowerShell-сессии без экспортированных
+  `TEST_*` variables и завершился до выполнения тестов. Повтор с явным окружением Compose прошёл
+  35/35.
+- Первый полный E2E Milestone 08 выявил ошибку маршрута в расширенном тесте: после согласования он
+  оставался на странице approvals, но проверял workflow action. Тест стал явно открывать workflow;
+  целевой прогон прошёл 1/1, полный — 20/20.
+- Compose rebuild дважды не вернул build output за десять минут из-за зависшего Docker Desktop.
+  После безопасного restart выяснилось, что новый image был собран; запуск без повторной сборки
+  завершил migration/storage-init и все healthchecks успешно.
 
 ## Принятые решения
 
@@ -104,6 +132,8 @@
   adapter и загружает каждый browser resource только через SSRF-safe IP-pinned transport.
 - ADR-044: временные DB connection errors повторяются только на границе цельного read-only server
   render; mutation retry по умолчанию запрещён.
+- ADR-045: approval хранит exact entity/acknowledgement snapshot; решение client approver
+  serializable и идемпотентно, `recorded_externally` остаётся отдельной immutable сущностью.
 
 ## Выполненные проверки
 
@@ -143,11 +173,28 @@
 - UX review cover manager: format/lint/strict typecheck/unit/build успешны; project E2E 1/1
   подтверждает выбор файла, quarantine upload и axe без нарушений. Desktop 1440 px и mobile 390 px
   проверены по реальному server-rendered экрану после Compose rebuild.
+- Milestone 08 промежуточно: migration `0000`–`0016` применены на чистой `garun_m08_verify`,
+  повторный `pnpm db:generate` — `No schema changes`; integration 34/34.
+- Milestone 08 итогово: frozen install, format/check, lint, strict typecheck и unit suites успешны;
+  core 48/48, worker 19/19, web 14/14 и остальные пакеты зелёные.
+- Migrations `0000`–`0016` применены на чистой `garun_m08_final` (17 записей), таблица
+  `approval_request` создана, повторный `pnpm db:generate` — `No schema changes`.
+- Integration 35/35 на PostgreSQL, Redis, MinIO, Mailpit и ClamAV; отдельный approval suite 5/5
+  проверяет idempotency/concurrency, revoke access, immutable evidence, stale revision,
+  blocking feedback, tenant isolation и client audit filtering.
+- Production web/worker build и artifact verification успешны. Целевой approval/project E2E 1/1,
+  полный Playwright/axe suite 20/20.
+- Новый Compose image собран; migration/storage-init exited 0, web/worker и все зависимости healthy.
+  Liveness/readiness вернули 200 без чувствительных данных; `pnpm smoke` прошёл.
+- `pnpm audit --prod --audit-level=high` не нашёл runtime advisory; один документированный ignored
+  high advisory остаётся только в dev-only ESLint toolchain по ADR-042. `git diff --check`,
+  tracked-file hygiene и high-confidence secret scan прошли.
 
 ## Следующие действия
 
-1. Провести review/merge ветки Milestone 07.5.
-2. После отдельного подтверждения перейти к Milestone 08.
+1. Провести review и объединить `feat/milestone-08-approvals-audit` с `main`.
+2. После merge повторить CI на `main`.
+3. Затем подготовить отдельную ветку Milestone 09; до merge Milestone 08 его не начинать.
 
 ## Известные ограничения
 
@@ -164,3 +211,6 @@
 - Production domain, R2, scanner deployment, RUM/APM и credentials не создавались.
 - PostgreSQL RLS отложен; isolation обеспечивается server policies, scoped queries, composite
   constraints и cross-tenant/IDOR tests.
+- Старые `scope_revision_approver`/`scope_approval_decision` остаются только в migration history
+  для совместимости существующих установок; новые scope requests используют общий approval
+  primitive.

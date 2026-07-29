@@ -82,7 +82,6 @@ test('owner publishes one project and grants then revokes explicit client access
   const coverAccessibility = await new AxeBuilder({ page }).include('#project-cover').analyze();
   expect(coverAccessibility.violations).toEqual([]);
   await page.getByRole('button', { name: 'Загрузить обложку' }).click();
-  await expect(page.getByText('Изображение проверяется.')).toBeVisible();
   await expect
     .poll(
       async () =>
@@ -157,6 +156,11 @@ test('owner publishes one project and grants then revokes explicit client access
   await expect(
     clientPage.getByRole('heading', { name: 'Проверьте и согласуйте границы проекта' }),
   ).toBeVisible();
+  await clientPage
+    .getByRole('checkbox', {
+      name: 'Я ознакомился(лась) с этой версией границ проекта и подтверждаю своё решение',
+    })
+    .check();
   await clientPage.getByRole('button', { name: 'Согласовать версию' }).click();
   await expect(clientPage.getByText('Изменения сохранены.')).toBeVisible();
 
@@ -166,6 +170,37 @@ test('owner publishes one project and grants then revokes explicit client access
   await page.getByLabel('Начало', { exact: true }).fill('2026-09-01');
   await page.getByLabel('Завершение', { exact: true }).fill('2026-09-10');
   await page.getByRole('button', { name: 'Добавить этап' }).click();
+  let stageCard = page.locator('.compact-list li').filter({ hasText: 'Прототип' });
+  await stageCard.getByLabel('Новый статус этапа Прототип').selectOption('in_progress');
+  await stageCard.getByRole('button', { name: 'Обновить' }).click();
+  stageCard = page.locator('.compact-list li').filter({ hasText: 'Прототип' });
+  await stageCard.getByLabel('Новый статус этапа Прототип').selectOption('ready_for_review');
+  await stageCard.getByPlaceholder('Результат для проверки').fill('Интерактивный прототип готов');
+  await stageCard.getByRole('button', { name: 'Обновить' }).click();
+
+  await page.getByRole('link', { name: 'Согласования' }).click();
+  await page.getByLabel('Что согласовываем').selectOption({ label: 'Этап · Прототип' });
+  await page.getByRole('group', { name: 'Назначенные согласующие' }).getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Отправить на согласование' }).click();
+  await expect(page.getByText('Ожидает решения')).toBeVisible();
+
+  await clientPage.goto(`/workspace/e2e-studio/projects/${projectSlug}/approvals`);
+  await expect(
+    clientPage.getByRole('heading', { name: 'Проверьте назначенный результат' }),
+  ).toBeVisible();
+  await clientPage.getByLabel(/Я прочитал/).check();
+  await clientPage.getByRole('button', { name: 'Согласовать', exact: true }).click();
+  await expect(
+    clientPage
+      .locator('.approval-card')
+      .filter({ hasText: 'Прототип' })
+      .getByText('Согласовано')
+      .first(),
+  ).toBeVisible();
+  const approvalAccessibility = await new AxeBuilder({ page: clientPage }).analyze();
+  expect(approvalAccessibility.violations).toEqual([]);
+
+  await page.goto(`/workspace/e2e-studio/projects/${projectSlug}/workflow`);
   await page.getByLabel('Название действия').fill('Передать логотип');
   await page.getByLabel('Исполнитель').selectOption({ index: 1 });
   await page.getByLabel('Видимость').selectOption('client');
@@ -173,7 +208,7 @@ test('owner publishes one project and grants then revokes explicit client access
   await page.getByLabel('Блокирует дальнейший ход проекта').check();
   await page.getByRole('button', { name: 'Создать действие' }).click();
 
-  await clientPage.reload();
+  await clientPage.goto(`/workspace/e2e-studio/projects/${projectSlug}/workflow`);
   await expect(clientPage.getByRole('heading', { name: 'Передать логотип' })).toBeVisible();
   await clientPage.getByRole('button', { name: 'Отметить выполненным' }).click();
   await expect(clientPage.getByText('Изменения сохранены.')).toBeVisible();

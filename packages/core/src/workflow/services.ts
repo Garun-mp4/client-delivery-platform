@@ -1,19 +1,20 @@
-import { and, desc, eq, isNull, ne, sql } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
+
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 
 import type { DatabaseClient } from '@garun/db';
 import {
   actionItem,
+  approvalRequest,
   auditEvent,
-  clientMembership,
   outboxEvent,
   project,
   projectMembership,
   projectScopeRevision,
   projectStage,
-  scopeApprovalDecision,
-  scopeRevisionApprover,
 } from '@garun/db/schema';
 
+import { createApprovalRequest, decideApprovalRequest } from '../approvals/services';
 import type { TenantContext } from '../identity/tenant';
 import { canAccessProject, resolveProjectAccess } from '../projects/policies';
 import { calculateProgress, canTransitionAction, validateStageTransition } from './state-machines';
@@ -142,66 +143,20 @@ export async function submitScopeRevision(
   approverUserId: string,
   request: RequestContext = {},
 ) {
-  const access = await requireAccess(client, tenant, slug, 'project.edit');
-  return client.db.transaction(async (tx) => {
-    const [approver] = await tx
-      .select({ userId: projectMembership.userId })
-      .from(projectMembership)
-      .innerJoin(
-        clientMembership,
-        and(
-          eq(clientMembership.workspaceId, projectMembership.workspaceId),
-          eq(clientMembership.userId, projectMembership.userId),
-          isNull(clientMembership.removedAt),
-          eq(clientMembership.canApprove, true),
-        ),
-      )
-      .where(
-        and(
-          eq(projectMembership.workspaceId, tenant.workspaceId),
-          eq(projectMembership.projectId, access.projectId),
-          eq(projectMembership.userId, approverUserId),
-          eq(projectMembership.side, 'client'),
-          isNull(projectMembership.removedAt),
-        ),
-      )
-      .limit(1);
-    if (!approver) throw new WorkflowServiceError('NOT_FOUND');
-    const [updated] = await tx
-      .update(projectScopeRevision)
-      .set({ status: 'client_review', submittedAt: new Date(), updatedAt: new Date() })
-      .where(
-        and(
-          eq(projectScopeRevision.id, revisionId),
-          eq(projectScopeRevision.projectId, access.projectId),
-          eq(projectScopeRevision.workspaceId, tenant.workspaceId),
-          eq(projectScopeRevision.status, 'draft'),
-        ),
-      )
-      .returning({ id: projectScopeRevision.id, revision: projectScopeRevision.revision });
-    if (!updated) throw new WorkflowServiceError('CONFLICT');
-    await tx.insert(scopeRevisionApprover).values({
-      workspaceId: tenant.workspaceId,
-      projectId: access.projectId,
-      scopeRevisionId: updated.id,
-      userId: approverUserId,
-    });
-    await tx.insert(auditEvent).values({
-      workspaceId: tenant.workspaceId,
-      actorUserId: tenant.userId,
-      action: 'scope_revision.submitted',
-      entityType: 'scope_revision',
-      entityId: updated.id,
-      requestId: request.requestId,
-      metadata: { revision: updated.revision, targetUserId: approverUserId },
-    });
-    await tx
-      .insert(outboxEvent)
-      .values(
-        domainEvent(tenant.workspaceId, access.projectId, 'scope.submitted', 'scope', updated.id),
-      );
-    return updated;
-  });
+  return createApprovalRequest(
+    client,
+    tenant,
+    slug,
+    {
+      target: { type: 'scope_revision', id: revisionId },
+      approverUserIds: [approverUserId],
+      mode: 'any_one',
+      acknowledgementText:
+        'Я ознакомился(лась) с указанной версией границ проекта и подтверждаю своё решение.',
+      idempotencyKey: `scope-submit:${revisionId}:${request.requestId ?? randomUUID()}`,
+    },
+    request,
+  );
 }
 
 export async function decideScopeRevision(
@@ -214,107 +169,31 @@ export async function decideScopeRevision(
   request: RequestContext = {},
 ) {
   const access = await requireAccess(client, tenant, slug, 'project.view');
-  if (access.side !== 'client') throw new WorkflowServiceError('FORBIDDEN');
-  return client.db.transaction(async (tx) => {
-    const [assigned] = await tx
-      .select({ id: scopeRevisionApprover.id })
-      .from(scopeRevisionApprover)
-      .where(
-        and(
-          eq(scopeRevisionApprover.workspaceId, tenant.workspaceId),
-          eq(scopeRevisionApprover.projectId, access.projectId),
-          eq(scopeRevisionApprover.scopeRevisionId, revisionId),
-          eq(scopeRevisionApprover.userId, tenant.userId),
-        ),
-      )
-      .limit(1);
-    if (!assigned) throw new WorkflowServiceError('NOT_FOUND');
-    const [revision] = await tx
-      .select()
-      .from(projectScopeRevision)
-      .where(
-        and(
-          eq(projectScopeRevision.id, revisionId),
-          eq(projectScopeRevision.workspaceId, tenant.workspaceId),
-          eq(projectScopeRevision.projectId, access.projectId),
-          eq(projectScopeRevision.status, 'client_review'),
-        ),
-      )
-      .limit(1);
-    if (!revision) throw new WorkflowServiceError('CONFLICT');
-    if (decision === 'changes_requested' && !comment?.trim()) {
-      throw new WorkflowServiceError('INVALID_STATE');
-    }
-    await tx.insert(scopeApprovalDecision).values({
-      workspaceId: tenant.workspaceId,
-      projectId: access.projectId,
-      scopeRevisionId: revision.id,
-      approverUserId: tenant.userId,
-      decision,
-      comment: comment?.trim() || null,
-    });
-    if (decision === 'agreed') {
-      await tx
-        .update(projectScopeRevision)
-        .set({ status: 'superseded', supersededAt: new Date(), updatedAt: new Date() })
-        .where(
-          and(
-            eq(projectScopeRevision.projectId, access.projectId),
-            eq(projectScopeRevision.workspaceId, tenant.workspaceId),
-            eq(projectScopeRevision.status, 'agreed'),
-            ne(projectScopeRevision.id, revision.id),
-          ),
-        );
-      await tx
-        .update(projectScopeRevision)
-        .set({
-          status: 'agreed',
-          agreedByUserId: tenant.userId,
-          agreedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(projectScopeRevision.id, revision.id));
-    } else {
-      await tx
-        .update(projectScopeRevision)
-        .set({ status: 'superseded', supersededAt: new Date(), updatedAt: new Date() })
-        .where(eq(projectScopeRevision.id, revision.id));
-      await tx.insert(projectScopeRevision).values({
-        ...revision,
-        id: undefined,
-        revision: revision.revision + 1,
-        status: 'draft',
-        submittedAt: null,
-        agreedByUserId: null,
-        agreedAt: null,
-        supersededAt: null,
-        createdByUserId: revision.createdByUserId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-    }
-    await tx.insert(auditEvent).values({
-      workspaceId: tenant.workspaceId,
-      actorUserId: tenant.userId,
-      action: `scope_revision.${decision}`,
-      entityType: 'scope_revision',
-      entityId: revision.id,
-      requestId: request.requestId,
-      metadata: { revision: revision.revision },
-    });
-    await tx
-      .insert(outboxEvent)
-      .values(
-        domainEvent(
-          tenant.workspaceId,
-          access.projectId,
-          `scope.${decision}`,
-          'scope',
-          revision.id,
-        ),
-      );
-    return { id: revision.id, decision };
-  });
+  const [active] = await client.db
+    .select({ id: approvalRequest.id })
+    .from(approvalRequest)
+    .where(
+      and(
+        eq(approvalRequest.workspaceId, tenant.workspaceId),
+        eq(approvalRequest.projectId, access.projectId),
+        eq(approvalRequest.scopeRevisionId, revisionId),
+        eq(approvalRequest.status, 'pending'),
+      ),
+    )
+    .limit(1);
+  if (!active) throw new WorkflowServiceError('NOT_FOUND');
+  return decideApprovalRequest(
+    client,
+    tenant,
+    slug,
+    active.id,
+    {
+      decision: decision === 'agreed' ? 'approved' : 'changes_requested',
+      comment,
+      idempotencyKey: `scope-decision:${revisionId}:${tenant.userId}:${request.requestId ?? randomUUID()}`,
+    },
+    request,
+  );
 }
 
 async function recalculateProgress(

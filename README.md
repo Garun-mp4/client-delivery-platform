@@ -1,10 +1,9 @@
 # Garun Workspace
 
-Client Delivery Platform. **Milestone 07.5** добавляет рабочий каталог проектов и приватные
-обложки. Ручные изображения проходят quarantine, ClamAV и нормализацию; автоматический first
-viewport создаётся worker только для опубликованной безопасной публичной версии сайта. Identity,
-deny-by-default RBAC, tenant isolation, audit trail и transactional outbox сохранены как серверная
-граница доступа.
+Client Delivery Platform. **Milestone 08** добавляет проверяемые согласования конкретных scope,
+этапов, версий, файлов и финальной передачи. Решение принимает только явно назначенный client
+approver; immutable snapshot, tenant isolation, serializable transaction, audit trail и
+transactional outbox остаются серверной границей доступа.
 
 ## Требования
 
@@ -159,6 +158,13 @@ checksum и фактический MIME, запускает ClamAV, удаляе
 замечание и после исправления закрывает его. Обычный комментарий статус не меняет, internal reply
 клиенту не передаётся. Подробный flow описан в `docs/REVIEW_LOOP.md`.
 
+Во вкладке «Согласования» внутренний участник выбирает готовый client-visible результат,
+назначает одного или нескольких клиентов с правом согласования и правило `any_one`/`all_required`.
+Клиент сначала раскрывает точный сохранённый снимок, подтверждает ознакомление и затем согласует
+либо запрашивает изменения. Владелец не может решить за клиента: ему доступны отмена с причиной и
+отдельная явная фиксация решения, полученного вне платформы. Подробности, permission matrix и схема
+данных находятся в `docs/APPROVALS_AND_AUDIT.md`.
+
 Локальные ограничения задаются в `infra/.env`: по умолчанию 100 MiB на файл, 10 GiB на workspace,
 15 минут для upload URL, 60 секунд для download URL и 24 часа до очистки незавершённой загрузки.
 MinIO bucket остаётся приватным. Не добавляйте реальные R2/production credentials в эти файлы.
@@ -308,4 +314,5 @@ transport/composition, а project/client policies и мутации находя
 - `docs/MATERIALS_AND_FILES.md` — quarantine, версии материалов, ACL и файловый worker;
 - `docs/UX_FOUNDATION.md` — role-based shell, дизайн-система и performance baseline;
 - `docs/REVIEW_LOOP.md` — updates, SiteVersion, SSRF-safe URL checks и feedback workflow;
+- `docs/APPROVALS_AND_AUDIT.md` — snapshots, approvers, decisions, concurrency и client-safe audit;
 - `AGENTS.md` — правила работы Codex.

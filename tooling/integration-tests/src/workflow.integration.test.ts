@@ -16,6 +16,7 @@ import {
 import { createDatabaseClient } from '@garun/db';
 import {
   auditEvent,
+  approvalRequest,
   clientCompany,
   clientMembership,
   outboxEvent,
@@ -149,6 +150,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await client.db
+    .delete(approvalRequest)
+    .where(inArray(approvalRequest.workspaceId, [workspaceAId, workspaceBId]));
   await client.db.delete(workspace).where(inArray(workspace.id, [workspaceAId, workspaceBId]));
   await client.pool.end();
 });

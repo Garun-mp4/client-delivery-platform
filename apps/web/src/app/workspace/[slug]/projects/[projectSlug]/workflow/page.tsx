@@ -215,6 +215,10 @@ export default async function WorkflowPage({
                   Комментарий (обязателен при запросе изменений)
                   <textarea name="comment" rows={4} />
                 </label>
+                <label className="confirm-control full-field">
+                  <input name="acknowledgementAccepted" required type="checkbox" value="yes" />Я
+                  ознакомился(лась) с этой версией границ проекта и подтверждаю своё решение
+                </label>
                 <button name="decision" value="agreed" type="submit">
                   Согласовать версию
                 </button>
