@@ -10,9 +10,20 @@ import { normalizeEmail, safeRelativeRedirect } from '@garun/core/identity';
 
 import { enqueueEmail } from './outbox';
 
+type AuthEnvironment = Pick<
+  WebEnvironment,
+  | 'APP_ENV'
+  | 'APP_NAME'
+  | 'PUBLIC_APP_URL'
+  | 'BETTER_AUTH_SECRET'
+  | 'AUTH_COOKIE_PREFIX'
+  | 'MAGIC_LINK_TTL_SECONDS'
+  | 'OUTBOX_ENCRYPTION_KEY'
+>;
+
 export function createAuth(
   database: DatabaseClient['db'],
-  environment: WebEnvironment,
+  environment: AuthEnvironment,
   allowBootstrapSignup = false,
   deliverMagicLink?: (message: { email: string; url: string }) => Promise<void>,
 ) {
@@ -87,7 +98,7 @@ export function createAuth(
 
 export async function createInvitationSessionResponse(
   database: DatabaseClient['db'],
-  environment: WebEnvironment,
+  environment: AuthEnvironment,
   input: { email: string; callbackURL: string; headers: Headers },
 ) {
   let verificationUrl: string | undefined;

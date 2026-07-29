@@ -19,11 +19,13 @@
     "@garun/contracts": "workspace:*",
     "@garun/db": "workspace:*",
     "@garun/observability": "workspace:*",
+    "@garun/storage": "workspace:*",
     "drizzle-orm": "catalog:",
     "ioredis": "catalog:",
     "nodemailer": "catalog:",
     "pg": "catalog:",
-    "pino": "catalog:"
+    "pino": "catalog:",
+    "sharp": "catalog:"
   },
   "devDependencies": {
     "@garun/eslint-config": "workspace:*",

@@ -5,8 +5,10 @@ import Redis from 'ioredis';
 import { parseWorkerEnv } from '@garun/config';
 import { checkDatabase, createDatabaseClient } from '@garun/db';
 import { createLogger, getOrCreateRequestId } from '@garun/observability';
+import { ClamAvScanner, S3ObjectStorage } from '@garun/storage';
 
 import { createWorkerHealthResponse } from './health';
+import { startFileProcessor } from './files';
 import { startOutboxDispatcher } from './outbox';
 
 const environment = parseWorkerEnv();
@@ -17,6 +19,7 @@ const logger = createLogger({
 });
 const database = createDatabaseClient(environment.DATABASE_URL);
 const stopOutbox = startOutboxDispatcher(database.pool, environment, logger);
+const stopFiles = startFileProcessor(database.pool, environment, logger);
 
 function sendJson(response: ServerResponse, statusCode: number, body: unknown, requestId: string) {
   response.writeHead(statusCode, {
@@ -52,15 +55,29 @@ const server = createServer(async (request, response) => {
     });
     redis.on('error', () => undefined);
 
-    const [databaseResult, redisResult] = await Promise.allSettled([
+    const storage = new S3ObjectStorage({
+      endpoint: environment.STORAGE_ENDPOINT,
+      publicEndpoint: environment.STORAGE_PUBLIC_ENDPOINT,
+      region: environment.STORAGE_REGION,
+      bucket: environment.STORAGE_BUCKET,
+      accessKey: environment.STORAGE_ACCESS_KEY,
+      secretKey: environment.STORAGE_SECRET_KEY,
+      forcePathStyle: environment.STORAGE_FORCE_PATH_STYLE,
+    });
+    const scanner = new ClamAvScanner(environment.SCANNER_HOST, environment.SCANNER_PORT);
+    const [databaseResult, redisResult, storageResult, scannerResult] = await Promise.allSettled([
       checkDatabase(environment.DATABASE_URL),
       redis.connect().then(() => redis.ping()),
+      storage.check(),
+      scanner.ping(),
     ]);
     redis.disconnect();
 
     const health = createWorkerHealthResponse(requestId, {
       database: databaseResult.status === 'fulfilled' ? 'ok' : 'error',
       redis: redisResult.status === 'fulfilled' ? 'ok' : 'error',
+      storage: storageResult.status === 'fulfilled' ? 'ok' : 'error',
+      scanner: scannerResult.status === 'fulfilled' ? 'ok' : 'error',
     });
     sendJson(response, health.status === 'ok' ? 200 : 503, health, requestId);
     return;
@@ -84,6 +101,7 @@ server.listen(environment.WORKER_PORT, environment.WORKER_HOST, () => {
 function shutdown(signal: NodeJS.Signals) {
   logger.info({ signal }, 'Worker shutdown requested');
   stopOutbox();
+  stopFiles();
   server.close((error) => {
     if (error) {
       logger.error({ errorCode: 'WORKER_SHUTDOWN_FAILED' }, 'Worker shutdown failed');

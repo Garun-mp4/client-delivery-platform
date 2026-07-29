@@ -10,7 +10,7 @@ import type {
 
 interface BuilderField {
   id: string;
-  type: Exclude<QuestionnaireFieldType, 'file' | 'image'>;
+  type: QuestionnaireFieldType;
   label: string;
   required: boolean;
   hint: string;
@@ -28,7 +28,7 @@ interface BuilderSection {
   fields: BuilderField[];
 }
 
-const typeLabels: Readonly<Record<Exclude<QuestionnaireFieldType, 'file' | 'image'>, string>> = {
+const typeLabels: Readonly<Record<QuestionnaireFieldType, string>> = {
   short_text: 'Короткий текст',
   long_text: 'Длинный текст',
   number: 'Число',
@@ -39,6 +39,8 @@ const typeLabels: Readonly<Record<Exclude<QuestionnaireFieldType, 'file' | 'imag
   multiple_choice: 'Несколько вариантов',
   date: 'Дата',
   toggle: 'Переключатель',
+  file: 'Файл',
+  image: 'Изображение',
   repeating_group: 'Повторяемая группа',
   info: 'Информационный блок',
 };
@@ -418,8 +420,8 @@ export function QuestionnaireBuilder({
         <button type="submit">Создать и отправить анкету</button>
       </div>
       <p className="fineprint">
-        Файлы и изображения появятся после включения безопасного файлового модуля. Сейчас
-        конструктор их намеренно не предлагает.
+        Файлы и изображения загружаются в приватное хранилище и появляются в ответе только после
+        проверки.
       </p>
     </form>
   );

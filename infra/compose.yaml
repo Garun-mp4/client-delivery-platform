@@ -16,6 +16,16 @@ x-application-environment: &application-environment
   WORKSPACE_QUOTA_BYTES: ${WORKSPACE_QUOTA_BYTES:-10737418240}
   DELETED_FILE_GRACE_DAYS: ${DELETED_FILE_GRACE_DAYS:-30}
   TECHNICAL_LOG_RETENTION_DAYS: ${TECHNICAL_LOG_RETENTION_DAYS:-90}
+  STORAGE_ENDPOINT: http://minio:9000
+  STORAGE_PUBLIC_ENDPOINT: http://127.0.0.1:9000
+  STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
+  STORAGE_BUCKET: ${STORAGE_BUCKET:-garun-private}
+  STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER:?Copy infra/.env.example to infra/.env}
+  STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?Copy infra/.env.example to infra/.env}
+  STORAGE_FORCE_PATH_STYLE: 'true'
+  STORAGE_UPLOAD_TTL_SECONDS: ${STORAGE_UPLOAD_TTL_SECONDS:-900}
+  STORAGE_DOWNLOAD_TTL_SECONDS: ${STORAGE_DOWNLOAD_TTL_SECONDS:-60}
+  INCOMPLETE_UPLOAD_RETENTION_HOURS: ${INCOMPLETE_UPLOAD_RETENTION_HOURS:-24}
 
 services:
   postgres:
@@ -65,6 +75,7 @@ services:
     environment:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Copy infra/.env.example to infra/.env}
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Copy infra/.env.example to infra/.env}
+      MINIO_API_CORS_ALLOW_ORIGIN: ${STORAGE_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3100,http://127.0.0.1:3100}
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
       interval: 5s
@@ -93,6 +104,20 @@ services:
     volumes:
       - mailpit_data:/data
 
+  clamav:
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'clamdscan', '--ping', '1']
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    ports:
+      - '127.0.0.1:3310:3310'
+    volumes:
+      - clamav_signatures:/var/lib/clamav
+
   migrate:
     image: garun-workspace-local-app:dev
     pull_policy: never
@@ -104,6 +129,24 @@ services:
       DATABASE_URL: ${APP_DATABASE_URL:?Copy infra/.env.example to infra/.env}
     depends_on:
       postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  storage-init:
+    image: garun-workspace-local-app:dev
+    pull_policy: never
+    command: ['pnpm', '--filter', '@garun/storage', 'storage:init']
+    environment:
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:?Copy infra/.env.example to infra/.env}
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_PUBLIC_ENDPOINT: http://127.0.0.1:9000
+      STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-garun-private}
+      STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER:?Copy infra/.env.example to infra/.env}
+      STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?Copy infra/.env.example to infra/.env}
+      STORAGE_FORCE_PATH_STYLE: 'true'
+    depends_on:
+      minio:
         condition: service_healthy
     restart: 'no'
 
@@ -119,6 +162,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      storage-init:
+        condition: service_completed_successfully
     healthcheck:
       test:
         [
@@ -147,6 +192,9 @@ services:
       SMTP_SECURE: 'false'
       WORKER_HOST: 0.0.0.0
       WORKER_PORT: 3001
+      SCANNER_HOST: clamav
+      SCANNER_PORT: 3310
+      SCANNER_REQUIRED: 'true'
     depends_on:
       mailpit:
         condition: service_healthy
@@ -155,6 +203,10 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      storage-init:
+        condition: service_completed_successfully
+      clamav:
         condition: service_healthy
     healthcheck:
       test:
@@ -173,6 +225,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  clamav_signatures:
   mailpit_data:
   minio_data:
   postgres_data:

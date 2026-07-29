@@ -3,6 +3,8 @@ import Redis from 'ioredis';
 import { Pool } from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
 
+import { ClamAvScanner } from '@garun/storage';
+
 function requireEnvironment(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) {
@@ -17,6 +19,8 @@ const minioEndpoint = requireEnvironment('TEST_MINIO_ENDPOINT');
 const minioAccessKey = requireEnvironment('TEST_MINIO_ACCESS_KEY');
 const minioSecretKey = requireEnvironment('TEST_MINIO_SECRET_KEY');
 const mailpitUrl = requireEnvironment('TEST_MAILPIT_URL');
+const scannerHost = requireEnvironment('TEST_SCANNER_HOST');
+const scannerPort = Number(requireEnvironment('TEST_SCANNER_PORT'));
 
 const pool = new Pool({ connectionString: databaseUrl });
 const redis = new Redis(redisUrl, { enableOfflineQueue: false, maxRetriesPerRequest: 1 });
@@ -42,6 +46,7 @@ const unauthenticatedS3 = new S3Client({
   region: 'us-east-1',
   credentials: { accessKeyId: 'invalid-access-key', secretAccessKey: 'invalid-secret-key' },
 });
+const scanner = new ClamAvScanner(scannerHost, scannerPort, 10_000);
 
 afterAll(async () => {
   await pool.end();
@@ -80,5 +85,24 @@ describe('local infrastructure', () => {
     const response = await fetch(`${mailpitUrl}/api/v1/info`);
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toContain('application/json');
+  });
+
+  it('scans clean content and rejects the standard antivirus test signature', async () => {
+    await expect(
+      scanner.scan(new TextEncoder().encode('Garun Workspace clean file')),
+    ).resolves.toEqual({
+      clean: true,
+      engine: 'clamav',
+      resultCode: 'CLEAN',
+    });
+    const antivirusTestSignature =
+      'X5O!P%@AP[4\\PZX54(P^)7CC)7}$' + 'EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*';
+    await expect(
+      scanner.scan(new TextEncoder().encode(antivirusTestSignature)),
+    ).resolves.toMatchObject({
+      clean: false,
+      engine: 'clamav',
+      resultCode: 'INFECTED',
+    });
   });
 });

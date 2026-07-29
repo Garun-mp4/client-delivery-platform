@@ -202,7 +202,7 @@ export function parseQuestionnaireInput(input: Record<string, unknown>): Questio
     description: text(input.description, 'description', 5_000) ?? null,
     assignedToUserId: text(input.assignedToUserId, 'assignedToUserId', 64, true)!,
     dueAt: parseDueDate(input.dueDate),
-    schema: parseQuestionnaireSchema(schemaValue),
+    schema: parseQuestionnaireSchema(schemaValue, { allowFileFields: true }),
   };
 }
 
@@ -282,7 +282,10 @@ function validateScalar(field: QuestionnaireField, value: unknown, path: string)
       return typeof value === 'boolean' ? value : undefined;
     case 'file':
     case 'image':
-      return undefined;
+      return typeof value === 'string' &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+        ? value.toLowerCase()
+        : undefined;
     case 'info':
     case 'repeating_group':
       throw new QuestionnaireValidationError(path);

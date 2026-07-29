@@ -1,102 +1,124 @@
 # Статус реализации
 
-Последнее обновление: 2026-07-17
-Общий статус: Milestones 00–05 завершены
+Последнее обновление: 2026-07-18
+Общий статус: Milestones 00–06 завершены
 
 ## Текущий milestone
 
-**Milestone 05 — анкеты и сбор информации — завершён и объединён с `main`.** Реализованы проектные анкеты,
-версионируемые черновики с optimistic concurrency, неизменяемые отправленные ревизии, запросы
-уточнений, обсуждение отдельных ответов и tenant-safe интерфейсы владельца и клиента. Scope
-Milestone 06 не начат.
+**Milestone 06 — материалы и безопасные файлы — завершён в
+`feat/milestone-06-files-materials`.** Реализован приватный versioned workflow материалов,
+quarantine pipeline с обязательной проверкой ClamAV, прямые подписанные загрузки в S3-compatible
+storage, безопасная выдача файлов, quota reservation, очистка незавершённых загрузок и файловые поля
+анкет. Milestone 07 не начат.
 
 ## Завершённые задачи
 
-- Добавлены `Questionnaire`, `QuestionnaireDraft`, `QuestionnaireSubmission` и
-  `QuestionnaireAnswerComment` с tenant/project composite constraints и индексами.
-- Схема анкеты сохраняется как versioned snapshot. Поддержаны секции, подсказки, примеры,
-  обязательность, условия видимости, повторяемые группы и все scalar-типы Milestone 05.
-- Типы `file` и `image` предусмотрены контрактом, но безопасно отклоняются конструктором и сервером
-  до готовности файлового контура Milestone 06.
-- Черновик хранится отдельно от отправленных ревизий. Автосохранение использует version token,
-  идемпотентно повторяет подтверждённую запись и возвращает явный конфликт устаревшей вкладке.
-- Сервер повторно вычисляет видимость, нормализует ответы, исключает скрытые значения и проверяет
-  обязательные поля. Клиентская логика использует тот же валидатор.
-- Отправленные ревизии неизменяемы на уровне service layer и PostgreSQL trigger. После запроса
-  уточнений создаётся новая ревизия без изменения истории.
-- Реализованы owner review (`accept`/`clarification_requested`), комментарии к конкретным ответам,
-  audit/outbox события и безопасные client/internal DTO.
-- Добавлены русскоязычные mobile-friendly страницы списка, конструктора и прохождения анкеты с
-  live progress, временем подтверждённого сохранения, offline/error/conflict состояниями и историей.
-- Добавлены unit, integration, tenant/IDOR, immutable submission, E2E и axe tests.
-- Созданы ADR-032–034 и `docs/QUESTIONNAIRES.md`.
+- Добавлены `Material`, `MaterialRevision`, `FileObject` и `FileLink` с tenant/project composite
+  constraints, историей ревизий и отдельными current/final projections.
+- Реализованы material requests, назначение клиенту, связанный `ActionItem`, audit/outbox событие,
+  ответы файлом, текстом или ссылкой, review `accept/clarify`, замена версии и сохранение истории.
+- Добавлен `packages/storage` с S3-compatible adapter для MinIO/R2, приватным bucket, короткими
+  presigned PUT/GET, подписанными length/MIME/checksum metadata и повторной авторизацией download.
+- Реализованы allowlist и server-side MIME sniffing, нормализация имени, random object key,
+  конфигурируемые лимит 100 MiB и quota 10 GiB с резервированием initiated uploads.
+- Worker выполняет claims через PostgreSQL `SKIP LOCKED`, SHA-256, MIME verification, ClamAV scan,
+  retries/backoff, reclaim зависших jobs, WebP preview с удалением EXIF и атомарный переход в
+  `available` вместе с revision/action/audit/outbox.
+- Файлы `pending/scanning` не попадают в клиентские DTO и не получают download URL; заражённые и
+  исчерпавшие retry файлы остаются недоступными.
+- Добавлена безопасная очистка незавершённых uploads; временный сбой БД или storage логируется
+  стабильным кодом и не создаёт необработанный background rejection.
+- Поля анкет `file` и `image` включены через тот же quarantine pipeline и проверяются при submit.
+- Добавлена русскоязычная mobile-friendly страница материалов с поиском по metadata/category,
+  multi-upload, progress, review, preview image/PDF и signed download.
+- Readiness web проверяет PostgreSQL, Redis и storage; readiness worker дополнительно проверяет
+  scanner. Liveness не зависит от внешних сервисов.
+- Локальный Compose дополнен ClamAV и idempotent storage initialization; CORS и CSP разрешают только
+  настроенный origin object storage.
+- Созданы миграции `0008`–`0011`, ADR-035–037, `docs/MATERIALS_AND_FILES.md` и обновлены README,
+  env examples, CI и Docker build context.
 
 ## Текущие задачи
 
-- Активных задач реализации нет.
-- Milestones 01–05 повторно проверены и находятся в `main`.
-- Milestone 06 не начат.
+- Активных задач реализации Milestone 06 нет.
+- Требуется создать Pull Request и провести обычную проверку ветки в GitHub Actions.
+- Milestone 07 не начат.
 
 ## Найденные проблемы
 
-- Drizzle сгенерировал composite foreign keys раньше поддерживающих unique indexes в миграциях
-  `0006` и `0007`. SQL переупорядочен и проверен как upgrade и на отдельной чистой PostgreSQL 17
-  базе.
-- Первый integration-тест ожидал текст ошибки immutable trigger напрямую, хотя Drizzle корректно
-  оборачивает ошибку драйвера. Проверка усилена: операция должна завершиться отказом, а сохранённая
-  ревизия — остаться неизменной.
-- Первый focused E2E успешно прошёл весь workflow, но строгий locator финального статуса совпал с
-  двумя элементами. Locator уточнён, desktop и mobile сценарии прошли повторно.
-- Две первые пересборки локального Docker image прервались из-за временных DNS/registry timeout при
-  скачивании npm-пакетов. В Dockerfile добавлен BuildKit cache mount для pnpm store; повторная
-  сборка завершилась, migration container вышел с кодом 0, сервисы healthy.
-- Исторический worker log содержит одну неуспешную локальную email delivery; retry-механизм не
-  раскрыл токен, последующие письма доставлены в Mailpit.
-- Финальный общий review воспроизвёл timeout web smoke при холодной development-компиляции `/`.
-  Endpoint оставался healthy, а после прогрева отвечал за 30–600 мс. Smoke переведён с одного
-  жёсткого пятисекундного запроса на ограниченное condition-based ожидание до 30 секунд; неверные
-  клиентские HTTP-статусы по-прежнему завершают проверку сразу.
+- Generated migrations первоначально создавали tenant composite foreign keys раньше supporting
+  unique indexes. SQL переупорядочен; полный путь `0000`–`0011` проверен на чистой PostgreSQL 17.
+- Исторические membership foreign keys использовали `RESTRICT`, поэтому очистка integration fixtures
+  конфликтовала с новыми material references. Добавлена явная upgrade migration `0011`, меняющая
+  только нужные связи на `CASCADE`.
+- MinIO не реализует S3 `PutBucketCors` и возвращает 501. Local CORS задаётся явной переменной
+  контейнера с разрешёнными origins; adapter не маскирует другие ошибки.
+- Первые presigned PUT не подписывали browser-controlled headers, из-за чего MinIO отвергал metadata
+  и Content-Type. Headers переведены в signable/unhoistable contract и проверены реальной загрузкой.
+- CSP сначала блокировал прямой browser PUT. Настроенный storage origin добавлен в `connect-src`;
+  `upgrade-insecure-requests` включается только для HTTPS public application URL.
+- Worker SQL имел неоднозначный вывод enum/JSON параметров в PostgreSQL. Добавлены явные casts,
+  переход `available` сделан транзакционным.
+- Questionnaire submit повторно разбирал schema с отключёнными file fields. Для Milestone 06
+  серверный re-parse явно разрешает file/image и всё равно проверяет ownership/status.
+- Stateful E2E-сценарии случайно дублировались mobile Playwright project. Они запускаются один раз со
+  своей mobile viewport; foundation/axe остаются desktop+mobile.
+- Финальный integration-запуск дважды остановился до полного набора из-за неполной локальной команды:
+  сначала отсутствовал `TEST_DATABASE_URL`, затем `TEST_MINIO_*`. После задания документированного
+  набора переменных тесты прошли 26/26; дефекта приложения эти попытки не выявили.
+- Финальный review обнаружил возможность необработанного rejection при отказе БД во время записи
+  retry-состояния или cleanup query. Оба пути теперь перехватываются и безопасно логируются.
 
 ## Принятые решения
 
-- ADR-032: schema snapshot принадлежит конкретной анкете проекта; библиотека переиспользуемых
-  шаблонов отложена, файловые поля закрыты до Milestone 06.
-- ADR-033: единственный mutable draft защищён optimistic version; каждая отправка создаёт отдельную
-  immutable submission revision.
-- ADR-034: сервер является источником истины для условий, видимости и progress; скрытые ответы не
-  принимаются как доверенные данные и не попадают в submission.
-- Внешние уведомления остаются domain/outbox событиями без ответов, содержимого анкеты и raw tokens.
+- ADR-035: прямой приватный upload/download через заменяемый S3-compatible adapter; web не
+  проксирует файлы до 100 MiB.
+- ADR-036: обязательный асинхронный quarantine pipeline; публикация при недоступном scanner
+  запрещена, PostgreSQL является текущей job queue.
+- ADR-037: material revisions append-only, quota резервируется до upload, файловые поля анкет
+  используют тот же `FileObject`.
+- Local incomplete upload retention — 24 часа; значение конфигурируемо. Production storage/scanner и
+  окончательная retention policy остаются предварительными.
+- Новые production dependencies ограничены `packages/storage` (`@aws-sdk/client-s3`,
+  `@aws-sdk/s3-request-presigner`) и worker (`sharp`); причины и альтернативы записаны в ADR.
 
 ## Выполненные проверки
 
-- `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test` —
-  успешно; unit tests включают 32/32 в `@garun/core`.
-- Миграции `0006` и `0007` применены как upgrade локального Compose и на отдельной чистой
-  PostgreSQL 17 базе; migration drift отсутствует, immutable trigger подтверждён.
-- `pnpm test:integration` — 23/23, включая optimistic/idempotent autosave, stale conflict,
-  immutable submission, clarification/resubmit, audit/outbox privacy и cross-tenant/IDOR.
-- `pnpm build` и `pnpm verify:artifacts` — успешно; web route tree и независимый worker artifact
-  собраны.
-- `pnpm test:e2e` — 17/17; questionnaire flow прошёл в desktop и mobile с axe-core.
-- `docker compose up -d --build --wait` — успешно после сетевых retries; migration exit 0,
-  web/worker/PostgreSQL/Redis/MinIO/Mailpit healthy.
-- `pnpm smoke` — web и worker успешно; `pnpm audit --prod` — известных уязвимостей нет.
-- `git diff --check`, tracked artifact scan и high-confidence secret scan — успешно.
-- GitHub Actions run `29578697017` для handoff commit завершён успешно.
-- Финальный feature CI run `29581707937` после smoke-исправления завершён успешно.
-- Общий review Milestones 01–05 подтвердил ацикличный workspace dependency graph, отсутствие
-  заглушек/type-suppression, migration drift, известных production-уязвимостей и tracked secrets.
+- `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`,
+  `pnpm test` — успешно; core 35/35, storage 5/5, остальные unit suites зелёные.
+- Чистая БД `garun_m06_final`: migrations `0000`–`0011` применены успешно; `pnpm db:generate`
+  сообщил `No schema changes`.
+- `pnpm test:integration` — 26/26 после корректной настройки test env; проверены реальные
+  PostgreSQL, Redis, MinIO, Mailpit, clean/EICAR ClamAV, quota, transactions и tenant/IDOR.
+- `pnpm build` и `pnpm verify:artifacts` — успешно; production web собран, worker artifact не
+  импортирует workspace TypeScript source.
+- `pnpm test:e2e` — 17/17; material path включает приглашение клиента, browser PUT, quarantine,
+  реальный scan, signed download, acceptance, IDOR denial и axe smoke.
+- `docker compose -f infra/compose.yaml up -d --build --wait` — успешно; migration/storage-init
+  exited 0, web/worker/PostgreSQL/Redis/MinIO/Mailpit/ClamAV healthy.
+- `pnpm smoke` — web и worker успешно. Liveness не раскрывает зависимости; readiness показывает
+  только безопасные статусы `database/redis/storage/scanner`.
+- `pnpm audit --prod` — известных уязвимостей нет.
+- `git diff --check`, tracked artifact scan, high-confidence secret scan, Compose log scan,
+  type-suppression scan — успешно.
+- Workspace dependency graph проверен как ацикличный.
 
 ## Следующие действия
 
-1. Следующий milestone — 06 (файлы и материалы), но не начинать без явного запроса.
+1. Создать Pull Request ветки `feat/milestone-06-files-materials`, дождаться зелёного CI и провести
+   ручной smoke upload/preview/download в браузере.
+2. После отдельного подтверждения перейти к Milestone 07 — обновления, версии сайта и review loop.
 
 ## Известные ограничения
 
-- Загрузка `file`/`image`, quarantine/scanner и object storage относятся к Milestone 06; до этого
-  такие поля нельзя опубликовать.
-- Переиспользуемая библиотека шаблонов анкет намеренно не входит в Milestone 05.
-- Одновременное редактирование решается явным stale conflict, а не real-time merge.
-- RLS отложен; защита основана на application policies, scoped repositories, composite constraints
-  и tenant/IDOR tests.
-- Локальный Compose использует development image; production build проверяется отдельно.
+- Cloudflare R2, production ClamAV deployment, домен и реальные credentials не создавались; они
+  остаются предварительными provider choices.
+- Multipart/resumable upload не входит в Milestone 06; один файл ограничен 100 MiB.
+- PDF preview использует проверенный оригинал inline; отдельный raster thumbnail создаётся только для
+  изображений.
+- Physical purge после 30-day deleted-file grace и пользовательский UI удаления относятся к
+  последующей retention/operations работе; очистка незавершённых uploads уже работает.
+- Глубокий content search, public shares, cloud-drive integrations, client-side editing и ZIP export
+  намеренно не входят в milestone.
+- RLS отложен; isolation обеспечивается server policies, scoped services, composite constraints и
+  cross-tenant/IDOR tests.

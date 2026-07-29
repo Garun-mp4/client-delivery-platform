@@ -60,6 +60,12 @@ function ClientProjectView({
         >
           Открыть анкеты
         </Link>
+        <Link
+          className="provider-link"
+          href={`/workspace/${workspaceSlug}/projects/${slug}/materials`}
+        >
+          Передать материалы
+        </Link>
       </p>
       {item.status === 'archived' ? (
         <p className="notice" role="status">
@@ -166,6 +172,12 @@ export default async function ProjectPage({
           href={`/workspace/${slug}/projects/${projectSlug}/questionnaires`}
         >
           Анкеты
+        </Link>
+        <Link
+          className="provider-link"
+          href={`/workspace/${slug}/projects/${projectSlug}/materials`}
+        >
+          Материалы
         </Link>
         <Link
           className="provider-link"
