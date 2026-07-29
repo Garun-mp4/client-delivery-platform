@@ -17,6 +17,8 @@ overrides:
   esbuild: 0.28.1
   postcss: 8.5.19
   sharp: 0.35.3
+  tar-stream: 3.2.0
+  '@types/tar-stream': 3.1.4
 
 catalog:
   '@axe-core/playwright': 4.12.1

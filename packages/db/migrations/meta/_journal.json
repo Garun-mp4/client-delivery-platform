@@ -127,6 +127,13 @@
       "when": 1785343115999,
       "tag": "0017_blushing_hannibal_king",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1785350302946,
+      "tag": "0018_fresh_stellaris",
+      "breakpoints": true
     }
   ]
 }

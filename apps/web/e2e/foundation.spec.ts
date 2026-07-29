@@ -76,3 +76,9 @@ test('liveness exposes no secrets and returns a correlation id', async ({ reques
     status: 'ok',
   });
 });
+
+test('unknown routes show a safe actionable page', async ({ page }) => {
+  await page.goto('/this-route-does-not-exist');
+  await expect(page.getByRole('heading', { name: 'Здесь ничего нет' })).toBeVisible();
+  await expect(page.getByText(/чужих рабочих пространств/)).toBeVisible();
+});

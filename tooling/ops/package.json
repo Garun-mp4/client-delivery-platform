@@ -1,0 +1,17 @@
+{
+  "name": "@garun/ops",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint .",
+    "test:performance": "node src/performance.mjs",
+    "backup:verify": "node src/backup-verify.mjs",
+    "audit:secrets": "node src/secret-scan.mjs"
+  },
+  "devDependencies": {
+    "@garun/eslint-config": "workspace:*",
+    "eslint": "catalog:",
+    "pg": "catalog:"
+  }
+}

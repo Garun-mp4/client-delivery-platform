@@ -10,6 +10,7 @@ const sections = [
   { label: 'Материалы', suffix: '/materials' },
   { label: 'Проверка', suffix: '/review' },
   { label: 'Согласования', suffix: '/approvals' },
+  { label: 'Экспорт', suffix: '/export' },
 ] as const;
 
 export function ProjectNav({

@@ -584,6 +584,41 @@ cron без idempotency; доверять disabled UI; разрешить owner 
 framework. Один worker и один модульный монолит остаются посильными одному разработчику; queue
 payload и логи не содержат текста письма, URL, cookies или секретов.
 
+### ADR-047. Потоковый приватный экспорт с зафиксированной аудиторией
+
+**Решение:** `ExportJob` создаётся через project policy, хранит случайный idempotency key и
+зафиксированную аудиторию `internal|client`. Worker перед обработкой повторно проверяет active user,
+workspace/project membership и внутреннее permission. Client projection фильтрует данные на уровне
+SQL и не включает draft/internal objects; удалённый комментарий экспортируется только tombstone.
+Пакет `tar.gz` потоково содержит Markdown, автономный escaped HTML, manifest и оригиналы только
+clean/available разрешённых файлов. Он сохраняется в private storage, выдаётся только собственному
+requester через повторную policy и короткую signed URL, а после configurable retention удаляется.
+Лимиты числа/суммы вложений и rate limit предотвращают archive amplification.
+
+Production dependency `tar-stream@3.2.0` добавлена только worker: она создаёт tar как stream и не
+исполняет lifecycle scripts. Альтернативы: собирать весь ZIP в памяти (неприемлемо для 100 MiB
+файлов), поддерживать security-sensitive ZIP implementation самостоятельно, subprocess `tar`
+(непереносимая runtime-зависимость) или внешний archive SaaS. S3 adapter расширен streaming PUT с
+явным Content-Length; object key, имена файлов, contents и signed URL не логируются.
+
+**Причина:** экспорт должен включать originals, переживать большие проекты и сохранять actor
+visibility без публичного object URL или нового микросервиса.
+
+### ADR-048. Pilot readiness без фиктивной production среды
+
+**Решение:** Milestone 10 вводит provider-neutral operations contracts, safe aggregate worker
+metrics, alert catalog, high-confidence tracked-file secret scan, reproducible 100/5k/10k local
+performance profile и фактический Compose `pg_dump → isolated restore → integrity check` drill.
+Команда staging restore намеренно отказывается работать без отдельно утверждённой staging
+credential procedure. Production domain/accounts/data region/sender/scanner не создаются и
+контролируемый локальный/staging-like pilot не называется production-ready.
+
+**Альтернативы:** купить/создать providers без решения владельца; считать backup успешным без
+restore; публиковать management metrics наружу; формально отметить staging tests, не запуская их.
+
+**Причина:** инженерные контракты и rehearsal должны быть рабочими уже сейчас, но предварительные
+production решения не дают полномочий создавать ресурсы или секреты.
+
 ## 5. Планируемая структура репозитория
 
 Каталоги создаются по мере появления рабочего кода, а не пустым scaffold заранее.

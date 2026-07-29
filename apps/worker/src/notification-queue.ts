@@ -194,7 +194,8 @@ async function resolveNotificationTargets(
     join "user" u on u.id = target.user_id and u.status = 'active'
     join workspace_membership wm on wm.workspace_id = p.workspace_id
       and wm.user_id = target.user_id and wm.status = 'active'
-    where p.workspace_id = $1 and p.id = $2 and target.user_id is distinct from $3::uuid
+    where p.workspace_id = $1 and p.id = $2 and $4::uuid is not null
+      and target.user_id is distinct from $3::uuid
       and (
         wm.role = 'owner'
         or exists (

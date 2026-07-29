@@ -10,7 +10,9 @@ import { ClamAvScanner, S3ObjectStorage } from '@garun/storage';
 import { createWorkerHealthResponse } from './health';
 import { startCoverCaptureProcessor } from './cover-captures';
 import { startFileProcessor } from './files';
+import { startExportProcessor } from './exports';
 import { startNotificationQueue } from './notification-queue';
+import { formatOperationsMetrics, readOperationsMetrics } from './metrics';
 import { startOutboxProducer } from './outbox';
 import { startUrlChecker } from './url-checks';
 
@@ -24,6 +26,7 @@ const database = createDatabaseClient(environment.DATABASE_URL);
 const notifications = await startNotificationQueue(database.pool, environment, logger);
 const stopOutbox = startOutboxProducer(database.pool, notifications.queue, logger);
 const stopFiles = startFileProcessor(database.pool, environment, logger);
+const stopExports = startExportProcessor(database.pool, environment, logger);
 const stopUrlChecks = startUrlChecker(database.pool, environment.PUBLIC_APP_URL, logger);
 const stopCoverCaptures = startCoverCaptureProcessor(database.pool, environment, logger);
 
@@ -35,6 +38,16 @@ function sendJson(response: ServerResponse, statusCode: number, body: unknown, r
     'x-request-id': requestId,
   });
   response.end(JSON.stringify(body));
+}
+
+function sendText(response: ServerResponse, statusCode: number, body: string, requestId: string) {
+  response.writeHead(statusCode, {
+    'cache-control': 'no-store',
+    'content-type': 'text/plain; version=0.0.4; charset=utf-8',
+    'x-content-type-options': 'nosniff',
+    'x-request-id': requestId,
+  });
+  response.end(body);
 }
 
 const server = createServer(async (request, response) => {
@@ -89,6 +102,20 @@ const server = createServer(async (request, response) => {
     return;
   }
 
+  if (path === '/metrics') {
+    try {
+      sendText(
+        response,
+        200,
+        formatOperationsMetrics(await readOperationsMetrics(database.pool)),
+        requestId,
+      );
+    } catch {
+      sendText(response, 503, '# metrics unavailable\n', requestId);
+    }
+    return;
+  }
+
   sendJson(response, 404, { error: { code: 'NOT_FOUND', requestId } }, requestId);
 });
 
@@ -108,6 +135,7 @@ function shutdown(signal: NodeJS.Signals) {
   logger.info({ signal }, 'Worker shutdown requested');
   stopOutbox();
   stopFiles();
+  stopExports();
   stopUrlChecks();
   stopCoverCaptures();
   void notifications.close();

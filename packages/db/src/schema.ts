@@ -240,6 +240,14 @@ export const feedbackClassification = pgEnum('feedback_classification', [
   'potential_change',
 ]);
 export const commentVisibility = pgEnum('comment_visibility', ['internal', 'client']);
+export const exportJobStatus = pgEnum('export_job_status', [
+  'pending',
+  'processing',
+  'succeeded',
+  'failed',
+  'expired',
+]);
+export const exportAudience = pgEnum('export_audience', ['internal', 'client']);
 
 // Better Auth core model. Application code always writes a normalized lowercase email.
 export const user = pgTable(
@@ -2119,6 +2127,65 @@ export const projectHandoverChecklistItem = pgTable(
     }).onDelete('cascade'),
     uniqueIndex('handover_checklist_project_key_unique').on(table.projectId, table.itemKey),
     index('handover_checklist_project_completed_idx').on(table.projectId, table.completedAt),
+  ],
+);
+
+export const exportJob = pgTable(
+  'export_job',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    requestedByUserId: uuid('requested_by_user_id').notNull(),
+    audience: exportAudience('audience').notNull(),
+    status: exportJobStatus('status').notNull().default('pending'),
+    idempotencyKey: text('idempotency_key').notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    processingStartedAt: timestamp('processing_started_at', { withTimezone: true, mode: 'date' }),
+    completedAt: timestamp('completed_at', { withTimezone: true, mode: 'date' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }),
+    artifactStorageKey: text('artifact_storage_key'),
+    artifactSha256: text('artifact_sha256'),
+    artifactSize: bigint('artifact_size', { mode: 'number' }),
+    attachmentCount: integer('attachment_count'),
+    failureCode: text('failure_code'),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [project.id, project.workspaceId],
+      name: 'export_job_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.requestedByUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'export_job_requester_workspace_fk',
+    }).onDelete('restrict'),
+    uniqueIndex('export_job_id_project_workspace_unique').on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
+    uniqueIndex('export_job_workspace_idempotency_unique').on(
+      table.workspaceId,
+      table.idempotencyKey,
+    ),
+    index('export_job_queue_idx').on(table.status, table.nextAttemptAt, table.createdAt),
+    index('export_job_project_requester_created_idx').on(
+      table.projectId,
+      table.requestedByUserId,
+      table.createdAt,
+    ),
+    index('export_job_expiry_idx').on(table.status, table.expiresAt),
+    check('export_job_attempts_check', sql`${table.attempts} >= 0`),
+    check(
+      'export_job_result_check',
+      sql`(${table.status} = 'succeeded' AND ${table.artifactStorageKey} IS NOT NULL AND ${table.artifactSha256} IS NOT NULL AND ${table.artifactSize} > 0 AND ${table.attachmentCount} >= 0 AND ${table.completedAt} IS NOT NULL AND ${table.expiresAt} IS NOT NULL AND ${table.failureCode} IS NULL) OR (${table.status} IN ('failed', 'expired') AND ${table.artifactStorageKey} IS NULL AND ${table.completedAt} IS NOT NULL AND ${table.failureCode} IS NOT NULL) OR (${table.status} IN ('pending', 'processing') AND ${table.artifactStorageKey} IS NULL AND ${table.completedAt} IS NULL AND ${table.failureCode} IS NULL)`,
+    ),
   ],
 );
 

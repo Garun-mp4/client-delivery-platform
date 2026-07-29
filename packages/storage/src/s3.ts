@@ -9,6 +9,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import type { Readable } from 'node:stream';
 
 export interface StorageConfiguration {
   readonly endpoint: string;
@@ -129,6 +130,18 @@ export class S3ObjectStorage {
         Bucket: this.config.bucket,
         Key: key,
         Body: body,
+        ContentType: contentType,
+      }),
+    );
+  }
+
+  putStream(key: string, body: Readable, size: number, contentType: string) {
+    return this.#internal.send(
+      new PutObjectCommand({
+        Bucket: this.config.bucket,
+        Key: key,
+        Body: body,
+        ContentLength: size,
         ContentType: contentType,
       }),
     );

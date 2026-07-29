@@ -7,6 +7,7 @@ export const projectPermissions = [
   'project.publish',
   'project.archive',
   'project.complete',
+  'project.export',
   'project.members.manage',
 ] as const;
 

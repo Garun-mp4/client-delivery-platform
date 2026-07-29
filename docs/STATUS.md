@@ -1,12 +1,16 @@
 # Статус реализации
 
 Последнее обновление: 2026-07-29
-Общий статус: Milestones 00–09 и UX stabilization 06.5 завершены и объединены с `main`
+Общий статус: Milestones 00–09 и UX stabilization 06.5 объединены с `main`; инженерная часть
+Milestone 10 завершена в feature-ветке, внешний staging/pilot ожидает инфраструктуру
 
 ## Текущий milestone
 
-**Milestone 09 — уведомления, завершение и архив — реализован, проверен и объединён с `main`.**
-Post-merge CI `30479044166` завершён успешно. Milestone 10 не начинался.
+**Milestone 10 — production readiness и первый пилот: локальная инженерная приёмка завершена.**
+Экспорт истории, observability, backup/restore, performance/security automation и pilot runbook
+готовы. Полное закрытие milestone требует развёртывания предварительно выбранной production-like
+инфраструктуры и проведения реального пилота; домен, платные сервисы и production secrets не
+создавались.
 
 ## Завершённые задачи
 
@@ -68,11 +72,30 @@ Post-merge CI `30479044166` завершён успешно. Milestone 10 не �
 - Завершение, archive и restore выполняются транзакционно и идемпотентно с audit/outbox; архив
   остаётся read-only и восстанавливает точный предыдущий статус.
 - Добавлены migration `0017`, ADR-046 и `docs/NOTIFICATIONS_AND_COMPLETION.md`.
+- Добавлен приватный tenant-scoped экспорт истории проекта: role-specific snapshot, Markdown/HTML,
+  manifest и разрешённые clean/available вложения упаковываются worker в `tar.gz`.
+- Export job имеет immutable audience, idempotency key, retry/backoff, лимиты размера/вложений,
+  TTL 24 часа, audit/outbox и авторизованную same-origin выдачу без публичных object URL.
+- Добавлены русскоязычный mobile-friendly экран экспорта, безопасные pending/failed/expired states,
+  rate limit и E2E-проверка реального gzip-артефакта.
+- Worker публикует безопасные агрегированные метрики очередей/ошибок без tenant, URL, payload,
+  токенов и персональных данных.
+- Добавлены автоматизированные performance fixtures на 100/5 000/10 000 записей, secret scan
+  tracked/untracked файлов и реальная проверка backup → restore → required tables.
+- Добавлены staging templates, deployment/rollback, incident response, backup/restore,
+  observability, security, architecture, API/storage/notification справочники и pilot runbook.
+- Добавлена pilot seed-команда с явными входными параметрами без встроенных credentials.
+- Создана migration `0018` для `export_job`, ADR-047–048 и документация экспорта/передачи.
+- Финальный review исправил SQL bind для project-wide notification events; зависшие локальные
+  outbox-события повторно обработаны и перешли в `delivered`.
 
 ## Текущие задачи
 
-- Активных задач Milestone 09 нет.
-- Не начинать Milestone 10 до отдельного запроса.
+- Подготовить реальные staging credentials/configuration только после выбора и создания внешней
+  инфраструктуры владельцем проекта.
+- Провести smoke, backup/restore drill и пилотный клиентский проект на staging по
+  `docs/PILOT_RUNBOOK.md`.
+- Не начинать Milestone 11 до завершения внешнего release gate или отдельного решения владельца.
 
 ## Найденные проблемы
 
@@ -145,6 +168,19 @@ Post-merge CI `30479044166` завершён успешно. Milestone 10 не �
 - Следующий CI подтвердил integration 43/43, но тот же явный cleanup требовался E2E-fixture перед
   удалением проекта. Browser-сценарий теперь также сначала удаляет созданный им approval request;
   production foreign keys остаются `RESTRICT`.
+- Первый export E2E обнаружил PostgreSQL date, возвращаемый как `Date`, и несовместимый тип enum в
+  retry update. Даты нормализуются на data boundary, статусы имеют явные casts; реальные jobs
+  завершились `succeeded`.
+- Параллельный export E2E сохранял rate-limit state между прогонами. Global setup теперь очищает
+  только детерминированный test key после явного Redis connect; production limit не ослаблялся.
+- Первый clean migration запуск использовал устаревший пароль старого Docker volume и не дошёл до
+  БД. Независимая временная роль/БД подтвердила успешное применение migrations `0000`–`0018`.
+- Review Compose-логов выявил SQL bind mismatch для событий `project.completed`,
+  `project.archived`, `site_version.published` и `feedback.created`: передавался aggregate ID без
+  ссылки на `$4` в общей ветке запроса. Запрос исправлен, добавлен regression integration test;
+  шесть локальных failed событий безопасно повторены и доставлены.
+- Security review автономного HTML-экспорта добавил собственный allowlist HTTP(S) для `href`:
+  повреждённая legacy-запись с иной схемой остаётся текстом и не становится активной ссылкой.
 
 ## Принятые решения
 
@@ -167,6 +203,10 @@ Post-merge CI `30479044166` завершён успешно. Milestone 10 не �
 - ADR-046: PostgreSQL остаётся durable transactional outbox, BullMQ отвечает только за delivery
   scheduling/retries; notification content allowlisted, а completion/archive используют отдельные
   server policies и транзакционные gates.
+- ADR-047: project history export создаётся асинхронно, фиксирует audience при запросе, хранится
+  приватно с коротким TTL и никогда не расширяет права вызывающего пользователя.
+- ADR-048: production readiness опирается на provider-neutral adapters, безопасные aggregate
+  metrics, проверяемый backup/restore и конфигурационные staging templates без реальных секретов.
 
 ## Выполненные проверки
 
@@ -236,11 +276,26 @@ Post-merge CI `30479044166` завершён успешно. Milestone 10 не �
 - Post-merge CI `30479044166` на `main`: install с frozen lockfile, production audit, format,
   lint, strict typecheck, migration drift, unit/integration, clean migrations, build, artifact
   verification, Playwright/axe и smoke завершены успешно.
+- Milestone 10: frozen install, format check, lint, strict typecheck и unit suites прошли; core
+  52/52, worker 26/26, web 14/14 и остальные пакеты зелёные.
+- `pnpm db:generate` сообщает `No schema changes`; migrations `0000`–`0018` применены к отдельной
+  чистой PostgreSQL 17, проверены таблицы `export_job`, `project`, `audit_event`, `outbox_event`.
+- Integration: 41 domain/storage assertions и 5 worker assertions; security subset 22/22.
+- Performance fixture: p95 catalog 5.01 ms, comments 7.70 ms, files 5.53 ms на локальном профиле;
+  backup/restore восстановил 4 required tables, архив 906 728 bytes.
+- Production Next.js/worker build и artifact verification успешны; Playwright E2E 26/26,
+  accessibility 17/17, web/worker smoke — passed.
+- Compose пересобран из текущих sources: web, worker, PostgreSQL, Redis, MinIO, Mailpit и ClamAV
+  healthy; migration/storage-init завершились успешно.
+- `pnpm audit --prod`: один документированный ignored high advisory dev-only ESLint toolchain по
+  ADR-042, активных runtime advisories нет. Secret scan прошёл для 413 tracked/untracked файлов.
 
 ## Следующие действия
 
-1. Следующим будет Milestone 10 — hardening, observability и production readiness; не начинать его
-   до отдельного запроса.
+1. Создать production-like staging только после подтверждения провайдеров, домена и бюджета.
+2. Настроить внешние secrets/backup destination/alerts и выполнить staging deployment checklist.
+3. Провести один реальный пилот, собрать обратную связь и зафиксировать go/no-go.
+4. После внешней приёмки объединить Milestone 10; Milestone 11 не начинать автоматически.
 
 ## Известные ограничения
 
@@ -264,3 +319,9 @@ Post-merge CI `30479044166` завершён успешно. Milestone 10 не �
 - Нет digest, push/Telegram, notification analytics и отдельного admin UI для failed BullMQ jobs.
 - Completion gate не учитывает оплату до появления включённого payment module; это соответствует
   утверждённому условному финансовому gate.
+- Production domain, Vercel/Railway/R2/Resend accounts, production scanner, monitoring destination
+  и секреты отсутствуют; staging deployment и реальный pilot этим репозиторием не симулируются.
+- Prometheus-compatible metrics доступны на worker endpoint, но внешний collector/dashboard/alerts
+  появятся только при развёртывании инфраструктуры.
+- Экспорт — point-in-time snapshot, а не юридически заверенная подпись или неизменяемый архив;
+  артефакт автоматически истекает и требует повторного запроса.

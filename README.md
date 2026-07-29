@@ -1,9 +1,9 @@
 # Garun Workspace
 
-Client Delivery Platform. **Milestone 08** добавляет проверяемые согласования конкретных scope,
-этапов, версий, файлов и финальной передачи. Решение принимает только явно назначенный client
-approver; immutable snapshot, tenant isolation, serializable transaction, audit trail и
-transactional outbox остаются серверной границей доступа.
+Client Delivery Platform. **Milestone 10** завершает первый рабочий MVP для контролируемого пилота:
+безопасный экспорт истории с разрешёнными оригиналами, handover/completion, performance и security
+gates, backup/restore rehearsal и операционные runbooks. Публичный production/SaaS запуск не
+разрешён до утверждения домена, providers, data region и privacy/retention решений.
 
 ## Требования
 
@@ -174,9 +174,16 @@ IANA timezone и тихие часы. In-app уведомления остают
 перевести в read-only архив и восстановить с прежним статусом. Подробный каталог и permission matrix
 находятся в `docs/NOTIFICATIONS_AND_COMPLETION.md`.
 
+Во вкладке проекта «Экспорт» владелец, участник или клиент может собрать собственную разрешённую
+проекцию истории. Worker повторно проверяет доступ и создаёт приватный `tar.gz` с Markdown, безопасным
+HTML, manifest и доступными clean originals. Клиентский пакет не содержит внутренних данных.
+Готовая ссылка короткоживущая, пакет по умолчанию удаляется через 24 часа. Подробности —
+`docs/EXPORTS_AND_HANDOVER.md`.
+
 Локальные ограничения задаются в `infra/.env`: по умолчанию 100 MiB на файл, 10 GiB на workspace,
-15 минут для upload URL, 60 секунд для download URL и 24 часа до очистки незавершённой загрузки.
-MinIO bucket остаётся приватным. Не добавляйте реальные R2/production credentials в эти файлы.
+15 минут для upload URL, 60 секунд для download URL, 24 часа до очистки незавершённой загрузки и
+24 часа хранения экспорта. Export ограничен 1 000 вложений и 1 GiB исходных файлов. MinIO bucket
+остаётся приватным. Не добавляйте реальные R2/production credentials в эти файлы.
 
 Health endpoints возвращают только service/check status и correlation ID. Connection strings,
 credentials и тексты ошибок зависимостей в ответ не включаются.
@@ -222,6 +229,10 @@ Unit tests и production build:
 pnpm test
 pnpm build
 pnpm verify:artifacts
+pnpm test:security
+pnpm test:performance
+pnpm audit:deps
+pnpm audit:secrets
 ```
 
 Integration tests требуют запущенный Docker Compose; единый Compose уже применяет migration.
@@ -246,6 +257,21 @@ server на `localhost:3100` и worker из готового build. Уже за�
 
 ```powershell
 pnpm test:e2e
+pnpm test:a11y
+```
+
+Проверить реальное создание и восстановление локальной резервной копии:
+
+```powershell
+pnpm backup:verify --env compose
+```
+
+Подготовить идемпотентный демонстрационный проект после owner bootstrap:
+
+```powershell
+$env:PILOT_WORKSPACE_SLUG = 'my-studio'
+$env:PILOT_OWNER_EMAIL = 'owner@example.test'
+pnpm seed:pilot
 ```
 
 Smoke test выполняется при уже запущенных production web и worker:
@@ -285,6 +311,7 @@ tooling/
   eslint/               единые flat ESLint configs
   integration-tests/    infrastructure, auth, projects, invitation и tenant/IDOR tests
   quality/              repository formatting task
+  ops/                  secret scan, performance profile и restore rehearsal
   typescript/           единые strict TypeScript configs
 infra/
   Dockerfile.local      общий non-root image для локальных web/worker/migrations
@@ -325,4 +352,11 @@ transport/composition, а project/client policies и мутации находя
 - `docs/REVIEW_LOOP.md` — updates, SiteVersion, SSRF-safe URL checks и feedback workflow;
 - `docs/APPROVALS_AND_AUDIT.md` — snapshots, approvers, decisions, concurrency и client-safe audit;
 - `docs/NOTIFICATIONS_AND_COMPLETION.md` — inbox/email, reminders, completion gate и архив;
+- `docs/EXPORTS_AND_HANDOVER.md` — приватный export pipeline, ACL, retention и state diagram;
+- `docs/ARCHITECTURE.md` и `docs/SECURITY_MODEL.md` — границы системы и threat controls;
+- `docs/BACKUP_RESTORE.md`, `docs/DEPLOYMENT.md`, `docs/OBSERVABILITY.md` — operations runbooks;
+- `docs/INCIDENT_RESPONSE.md` и `docs/PILOT_RUNBOOK.md` — инциденты, onboarding и поддержка пилота;
+- `docs/API_CONVENTIONS.md`, `docs/STORAGE_MODEL.md`, `docs/NOTIFICATION_CATALOG.md` — технические
+  контракты;
+- `docs/CONTRIBUTING.md` и `docs/CHANGELOG.md` — правила изменений и история;
 - `AGENTS.md` — правила работы Codex.

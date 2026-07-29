@@ -14,9 +14,9 @@ import {
 
 const rolePermissions: Readonly<Record<ProjectRole, ReadonlySet<ProjectPermission>>> = {
   owner: new Set(projectPermissions),
-  employee: new Set(['project.view']),
-  client: new Set(['project.view']),
-  observer: new Set(['project.view']),
+  employee: new Set(['project.view', 'project.export']),
+  client: new Set(['project.view', 'project.export']),
+  observer: new Set(['project.view', 'project.export']),
 };
 
 export function canAccessProject(

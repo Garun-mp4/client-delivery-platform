@@ -1,8 +1,10 @@
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { loadEnvFile } from 'node:process';
 
 import { hashPassword } from 'better-auth/crypto';
 import { and, eq } from 'drizzle-orm';
+import Redis from 'ioredis';
 
 import { createAuth } from '@garun/auth';
 import { parseWebEnv } from '@garun/config';
@@ -69,6 +71,27 @@ export default async function globalSetup() {
           metadata: { source: 'e2e' },
         });
       });
+    }
+    const workspaceId =
+      existing?.id ??
+      (
+        await database.db
+          .select({ id: workspace.id })
+          .from(workspace)
+          .where(eq(workspace.slug, 'e2e-studio'))
+          .limit(1)
+      )[0]?.id;
+    if (!workspaceId) throw new Error('E2E workspace lookup failed');
+    const digest = createHash('sha256').update(`${workspaceId}:${owner.id}`).digest('base64url');
+    const redis = new Redis(environment.REDIS_URL, {
+      lazyConnect: true,
+      maxRetriesPerRequest: 1,
+    });
+    try {
+      await redis.connect();
+      await redis.del(`rate:project-export:${digest}`);
+    } finally {
+      redis.disconnect();
     }
   } finally {
     await database.pool.end();

@@ -100,6 +100,15 @@ jobs:
       - name: Integration tests
         run: pnpm test:integration
 
+      - name: Security matrix
+        run: pnpm test:security
+
+      - name: Performance profile
+        run: pnpm test:performance
+
+      - name: Repository secret scan
+        run: pnpm audit:secrets
+
       - name: Production build
         run: pnpm build
 

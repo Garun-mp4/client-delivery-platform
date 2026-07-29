@@ -29,7 +29,8 @@
     "pg": "catalog:",
     "pino": "catalog:",
     "playwright-core": "catalog:",
-    "sharp": "catalog:"
+    "sharp": "catalog:",
+    "tar-stream": "catalog:"
   },
   "devDependencies": {
     "@garun/eslint-config": "workspace:*",
@@ -37,6 +38,7 @@
     "@types/node": "catalog:",
     "@types/nodemailer": "catalog:",
     "@types/pg": "catalog:",
+    "@types/tar-stream": "catalog:",
     "eslint": "catalog:",
     "tsup": "catalog:",
     "tsx": "catalog:",

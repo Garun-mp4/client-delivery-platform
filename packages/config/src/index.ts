@@ -79,6 +79,14 @@ const storageShape = {
   STORAGE_UPLOAD_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
   STORAGE_DOWNLOAD_TTL_SECONDS: z.coerce.number().int().min(30).max(300).default(60),
   INCOMPLETE_UPLOAD_RETENTION_HOURS: z.coerce.number().int().min(1).max(168).default(24),
+  EXPORT_ARTIFACT_RETENTION_HOURS: z.coerce.number().int().min(1).max(168).default(24),
+  EXPORT_MAX_ATTACHMENTS: z.coerce.number().int().min(1).max(10_000).default(1_000),
+  EXPORT_MAX_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1_048_576)
+    .max(10_737_418_240)
+    .default(1_073_741_824),
 } as const;
 
 const scannerShape = {

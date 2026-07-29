@@ -13,6 +13,7 @@ export function defineModule<const TModule extends ApplicationModule>(module: TM
 export * from './projects/index';
 
 export * from './identity/index';
+export * from './exports/index';
 export * from './materials/index';
 export * from './notifications/index';
 export * from './questionnaires/index';

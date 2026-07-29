@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "seed:pilot": "tsx --env-file-if-exists=.env src/seed-pilot.ts"
   },
   "dependencies": {
     "@garun/config": "workspace:*",
@@ -29,6 +30,7 @@
     "drizzle-kit": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",
+    "tsx": "catalog:",
     "vitest": "catalog:"
   }
 }

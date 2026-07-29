@@ -141,7 +141,43 @@ async function actionEvent(assigneeUserId: string, actorUserId: string) {
   return { actionId: action!.id, eventId: event!.id };
 }
 
+async function projectEvent(actorUserId: string) {
+  await client.db.insert(auditEvent).values({
+    workspaceId,
+    actorUserId,
+    action: 'project.completed',
+    entityType: 'project',
+    entityId: projectId,
+  });
+  const [event] = await client.db
+    .insert(outboxEvent)
+    .values({
+      workspaceId,
+      eventType: 'project.completed',
+      aggregateType: 'project',
+      aggregateId: projectId,
+      payload: { template: 'domain-event', projectId, entityType: 'project' },
+      status: 'processing',
+      lockedAt: new Date(),
+    })
+    .returning({ id: outboxEvent.id });
+  return event!.id;
+}
+
 describe('notification worker persistence and retries', () => {
+  it('materializes a project-wide event without a PostgreSQL bind mismatch', async () => {
+    const eventId = await projectEvent(ownerId);
+    const deliveries = await processOutbox(client.pool, eventId, environment, transport);
+
+    expect(deliveries).toHaveLength(1);
+    expect(
+      await client.db
+        .select({ id: notificationEvent.id })
+        .from(notificationEvent)
+        .where(eq(notificationEvent.sourceOutboxEventId, eventId)),
+    ).toHaveLength(1);
+  });
+
   it('materializes one visible event, suppresses the author and survives replay', async () => {
     const target = await actionEvent(memberId, ownerId);
     const first = await processOutbox(client.pool, target.eventId, environment, transport);
