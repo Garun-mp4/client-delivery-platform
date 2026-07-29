@@ -68,6 +68,7 @@ test('owner publishes one project and grants then revokes explicit client access
   await page.getByLabel('Описание').fill('Описание, доступное клиенту.');
   await page.getByRole('button', { name: 'Создать черновик' }).click();
   await expect(page).toHaveURL(new RegExp(`/projects/${projectSlug}`));
+  await expect(page.getByText('Перетащите изображение сюда')).toBeVisible();
   await page.getByLabel('Выбрать изображение').setInputFiles({
     name: 'cover.png',
     mimeType: 'image/png',
@@ -76,6 +77,10 @@ test('owner publishes one project and grants then revokes explicit client access
       'base64',
     ),
   });
+  await expect(page.getByText('cover.png')).toBeVisible();
+  await expect(page.getByText('готово к загрузке')).toBeVisible();
+  const coverAccessibility = await new AxeBuilder({ page }).include('#project-cover').analyze();
+  expect(coverAccessibility.violations).toEqual([]);
   await page.getByRole('button', { name: 'Загрузить обложку' }).click();
   await expect(page.getByText('Изображение проверяется.')).toBeVisible();
   await expect

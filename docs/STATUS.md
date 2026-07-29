@@ -39,6 +39,9 @@
   стадией, прогрессом, ответственностью, следующим результатом, сроком и активностью.
 - Реализованы private manual/automatic project covers, quarantine activation, Sharp WebP,
   same-origin delivery, capture queue и SSRF-safe Chromium renderer adapter.
+- Управление обложкой разделено на понятные сценарии: доступная с клавиатуры dropzone с
+  drag-and-drop, проверкой типа/размера и состоянием выбранного файла; автоматический снимок и
+  удаление ручной обложки вынесены в отдельные аккуратные действия с русскими статусами.
 - Добавлена migration `0015`, ADR-043, cover permissions/ER и документация renderer flow.
 
 ## Текущие задачи
@@ -137,6 +140,9 @@
   format/lint/typecheck/unit/integration/build/artifact проверки, project E2E 1/1, Compose
   healthchecks и smoke успешны; свежие логи не содержат повторного `EAI_AGAIN` или чувствительных
   значений.
+- UX review cover manager: format/lint/strict typecheck/unit/build успешны; project E2E 1/1
+  подтверждает выбор файла, quarantine upload и axe без нарушений. Desktop 1440 px и mobile 390 px
+  проверены по реальному server-rendered экрану после Compose rebuild.
 
 ## Следующие действия
 
