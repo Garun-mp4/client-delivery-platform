@@ -1,12 +1,13 @@
 # Статус реализации
 
 Последнее обновление: 2026-07-29
-Общий статус: Milestones 00–08 и UX stabilization 06.5 завершены
+Общий статус: Milestones 00–09 и UX stabilization 06.5 завершены в feature-ветках
 
 ## Текущий milestone
 
-**Milestone 08 — согласования и audit trail — завершён и объединён с `main`.** Следующий
-milestone — 09; его реализация не начиналась.
+**Milestone 09 — уведомления, завершение и архив — реализован и проверен в
+`feat/milestone-09-notifications-archive`.** До объединения требуется Pull Request и зелёный CI.
+Milestone 10 не начинался.
 
 ## Завершённые задачи
 
@@ -53,11 +54,26 @@ milestone — 09; его реализация не начиналась.
   `0016`, ADR-045 и `docs/APPROVALS_AND_AUDIT.md`.
 - Старый экран scope также требует явного подтверждения ознакомления; клиентская activity
   ограничена только назначенными этому пользователю requests и не раскрывает чужие события.
+- Добавлен tenant-scoped центр уведомлений с прочитанным состоянием, относительными deep links,
+  безопасным role-specific содержимым, пользовательскими email/reminder-настройками, timezone и
+  quiet hours.
+- Transactional outbox передаёт задания в BullMQ с идемпотентными job ID, retry/backoff и
+  диагностируемыми delivery statuses; доступ получателя повторно проверяется перед отправкой.
+- Worker создаёт дедуплицированные уведомления о назначениях, материалах, согласованиях, review и
+  завершении; автор события не уведомляется о собственном действии.
+- Добавлены ежедневные due-soon/overdue reminders с подавлением после завершения, архивации,
+  отключения preference или потери доступа.
+- Реализован completion gate: обязательные этапы, отсутствие открытых blocking actions, финальное
+  согласование и фиксированный checklist передачи. Финансовый gate не применяется без payment
+  module.
+- Завершение, archive и restore выполняются транзакционно и идемпотентно с audit/outbox; архив
+  остаётся read-only и восстанавливает точный предыдущий статус.
+- Добавлены migration `0017`, ADR-046 и `docs/NOTIFICATIONS_AND_COMPLETION.md`.
 
 ## Текущие задачи
 
-- Нет активных задач Milestone 08.
-- Перед Milestone 09 требуется подтвердить зелёный post-merge CI на `main`.
+- Создать commit, отправить feature-ветку и получить зелёный CI/PR review.
+- Не начинать Milestone 10 до объединения и post-merge проверки Milestone 09.
 
 ## Найденные проблемы
 
@@ -115,6 +131,14 @@ milestone — 09; его реализация не начиналась.
 - Compose rebuild дважды не вернул build output за десять минут из-за зависшего Docker Desktop.
   После безопасного restart выяснилось, что новый image был собран; запуск без повторной сборки
   завершил migration/storage-init и все healthchecks успешно.
+- Финальный integration review Milestone 09 обнаружил запрос к несуществующей
+  `workspace.owner_user_id`. Получатели-владельцы теперь определяются через активный
+  `workspace_membership.role = owner`; полный повторный прогон прошёл 43/43.
+- Первый smoke после свежей Compose-сборки превысил 30 секунд из-за холодной компиляции Turbopack.
+  После завершения compile корень отвечал за 141 ms, повторный smoke прошёл без ошибок.
+- Два integration запуска были некорректно начаты без полного `TEST_*` окружения и с неверным
+  локальным паролем; тесты безопасно отказались работать. Повтор выполнен с документированным
+  Compose-окружением и прошёл полностью.
 
 ## Принятые решения
 
@@ -134,6 +158,9 @@ milestone — 09; его реализация не начиналась.
   render; mutation retry по умолчанию запрещён.
 - ADR-045: approval хранит exact entity/acknowledgement snapshot; решение client approver
   serializable и идемпотентно, `recorded_externally` остаётся отдельной immutable сущностью.
+- ADR-046: PostgreSQL остаётся durable transactional outbox, BullMQ отвечает только за delivery
+  scheduling/retries; notification content allowlisted, а completion/archive используют отдельные
+  server policies и транзакционные gates.
 
 ## Выполненные проверки
 
@@ -192,11 +219,21 @@ milestone — 09; его реализация не начиналась.
 - Post-merge проверка `main`: frozen install, format, lint, strict typecheck, unit 48/19/14,
   migration drift, integration 35/35, production build/artifact, Playwright/axe 20/20 и smoke
   прошли без ошибок.
+- Milestone 09: frozen install, format/check, lint, strict typecheck и unit suites прошли; core
+  51/51, worker 22/22, web 14/14.
+- Migrations `0000`–`0017` применены на существующей и чистой PostgreSQL 17, повторное применение
+  идемпотентно, `pnpm db:generate` сообщает `No schema changes`.
+- Integration 43/43: 39 domain/storage/security и 4 worker persistence/retry tests.
+- Production web/worker build и artifact verification успешны; полный Playwright/axe suite 22/22.
+- Compose migration/storage-init exited 0; web, worker, PostgreSQL, Redis, MinIO, Mailpit и ClamAV
+  healthy. Liveness/readiness вернули 200; повторный `pnpm smoke` прошёл.
 
 ## Следующие действия
 
-1. Подтвердить зелёный post-merge CI на `main`.
-2. Затем подготовить отдельную ветку Milestone 09; его реализация ещё не начиналась.
+1. Отправить `feat/milestone-09-notifications-archive`, открыть Pull Request и дождаться CI/review.
+2. После merge выполнить короткую post-merge проверку `main`.
+3. Следующим будет Milestone 10 — hardening, observability и production readiness; не начинать его
+   до отдельного запроса.
 
 ## Известные ограничения
 
@@ -216,3 +253,7 @@ milestone — 09; его реализация не начиналась.
 - Старые `scope_revision_approver`/`scope_approval_decision` остаются только в migration history
   для совместимости существующих установок; новые scope requests используют общий approval
   primitive.
+- Email остаётся локальным через Mailpit; production provider и credentials не подключались.
+- Нет digest, push/Telegram, notification analytics и отдельного admin UI для failed BullMQ jobs.
+- Completion gate не учитывает оплату до появления включённого payment module; это соответствует
+  утверждённому условному финансовому gate.

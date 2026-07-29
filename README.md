@@ -165,6 +165,15 @@ checksum и фактический MIME, запускает ClamAV, удаляе
 отдельная явная фиксация решения, полученного вне платформы. Подробности, permission matrix и схема
 данных находятся в `docs/APPROVALS_AND_AUDIT.md`.
 
+Раздел «Уведомления» показывает tenant-scoped события и ведёт только по повторно авторизуемым deep
+links. Здесь можно отметить события прочитанными, отключить проектные письма/напоминания, выбрать
+IANA timezone и тихие часы. In-app уведомления остаются мгновенными; локальные email по-прежнему
+проверяются в Mailpit. Для завершения проекта откройте на его обзоре «Статус проекта» → «Проверить
+готовность к завершению»: обязательны завершённые/обоснованно пропущенные этапы, отсутствие
+блокирующих действий, финальное client approval и checklist передачи. После завершения проект можно
+перевести в read-only архив и восстановить с прежним статусом. Подробный каталог и permission matrix
+находятся в `docs/NOTIFICATIONS_AND_COMPLETION.md`.
+
 Локальные ограничения задаются в `infra/.env`: по умолчанию 100 MiB на файл, 10 GiB на workspace,
 15 минут для upload URL, 60 секунд для download URL и 24 часа до очистки незавершённой загрузки.
 MinIO bucket остаётся приватным. Не добавляйте реальные R2/production credentials в эти файлы.
@@ -315,4 +324,5 @@ transport/composition, а project/client policies и мутации находя
 - `docs/UX_FOUNDATION.md` — role-based shell, дизайн-система и performance baseline;
 - `docs/REVIEW_LOOP.md` — updates, SiteVersion, SSRF-safe URL checks и feedback workflow;
 - `docs/APPROVALS_AND_AUDIT.md` — snapshots, approvers, decisions, concurrency и client-safe audit;
+- `docs/NOTIFICATIONS_AND_COMPLETION.md` — inbox/email, reminders, completion gate и архив;
 - `AGENTS.md` — правила работы Codex.

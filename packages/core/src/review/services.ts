@@ -412,6 +412,11 @@ export async function addFeedbackComment(
       entityId: created!.id,
       requestId,
     });
+    await tx
+      .insert(outboxEvent)
+      .values(
+        domainEvent(tenant.workspaceId, allowed.projectId, 'feedback.comment_added', created!.id),
+      );
     return created!;
   });
 }

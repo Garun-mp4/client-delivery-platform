@@ -14,5 +14,6 @@ export * from './projects/index';
 
 export * from './identity/index';
 export * from './materials/index';
+export * from './notifications/index';
 export * from './questionnaires/index';
 export * from './workflow/index';

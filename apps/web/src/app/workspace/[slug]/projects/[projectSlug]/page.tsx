@@ -161,6 +161,11 @@ async function renderProjectPage({ params, searchParams }: ProjectPageProps) {
         </Link>
       </header>
       <ProjectNav projectSlug={projectSlug} workspaceSlug={slug} />
+      {archived ? (
+        <p className="notice" role="status">
+          Проект находится в архиве и доступен только для чтения.
+        </p>
+      ) : null}
       {feedback.success ? (
         <p className="notice success" role="status">
           Операция выполнена.
@@ -455,6 +460,16 @@ async function renderProjectPage({ params, searchParams }: ProjectPageProps) {
           </span>
         </summary>
         <div className="disclosure-body">
+          {!archived ? (
+            <p>
+              <Link
+                className="button-secondary"
+                href={`/workspace/${slug}/projects/${projectSlug}/completion`}
+              >
+                Проверить готовность к завершению
+              </Link>
+            </p>
+          ) : null}
           {archived ? (
             isOwner(tenant) ? (
               <form

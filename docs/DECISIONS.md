@@ -546,6 +546,44 @@ FK и server policy закрывают cross-tenant/IDOR, serializable retry к�
 одновременные решения, а отдельный внешний record не искажает происхождение решения. Новых
 production dependencies не требуется.
 
+### ADR-046. PostgreSQL outbox, BullMQ delivery и server-authoritative completion
+
+**Решение:** бизнес-мутация и минимальный domain event фиксируются одной транзакцией в
+PostgreSQL `outbox_event`. Неблокирующий dispatcher передаёт только идентификатор события и
+tenant context в BullMQ. Worker повторно восстанавливает получателей из PostgreSQL, подавляет
+уведомление автору, создаёт ровно один `notification_event` на recipient/dedupe key и отдельные
+`notification_delivery` для in-app и email. Повторная materialization является upsert: падение
+между созданием события и доставки не теряет канал и не создаёт второй видимый экземпляр.
+
+BullMQ `5.81.2` принят как production dependency для delayed jobs, экспоненциального backoff,
+фиксированного reminder scheduler и сохраняемых failed jobs. Redis outage не откатывает бизнес-
+операцию: outbox возвращается в `pending`. После восьми неуспешных попыток delivery/outbox получает
+безопасный terminal failure code, а BullMQ job остаётся доступен для диагностики. Опциональный
+native accelerator `msgpackr-extract` намеренно не собирается (`allowBuilds: false`): корректность
+BullMQ от него не зависит, а лишний lifecycle script не нужен.
+
+Email preferences применяются только к проектным уведомлениям; приглашения и security/auth письма
+ими не отключаются. Тихие часы вычисляются в IANA timezone получателя и задерживают только email:
+in-app событие появляется сразу. Перед фактической отправкой worker повторно проверяет активный
+workspace membership, а reminder — незавершённость action. Email содержит только allowlisted
+presentation, название проекта и relative deep link, дополненный настроенным `PUBLIC_APP_URL`.
+
+Completion остаётся server-authoritative: `project.complete` проверяет обязательные approved либо
+обоснованно skipped stages, отсутствие открытых blocking actions, последний approved
+`final_handover` request и четыре обязательных checklist item. Проверка повторяется под row lock в
+транзакции; успешное завершение создаёт audit/outbox ровно один раз. Payment gate отсутствует, пока
+payment module не включён. Архивирование сохраняет предыдущий статус, запрещает бизнес-мутации
+policy-слоем и разрешает владельцу восстановление.
+
+**Альтернативы:** синхронно отправлять SMTP в request; хранить полный email/raw URL в Redis;
+оставить polling PostgreSQL единственной delayed queue; отдельный notification microservice;
+cron без idempotency; доверять disabled UI; разрешить owner bypass completion gates.
+
+**Причина:** гибрид сохраняет PostgreSQL источником истины и атомарность бизнес-операции, но
+использует уже предусмотренный Redis для надёжных delayed retries без собственного scheduler
+framework. Один worker и один модульный монолит остаются посильными одному разработчику; queue
+payload и логи не содержат текста письма, URL, cookies или секретов.
+
 ## 5. Планируемая структура репозитория
 
 Каталоги создаются по мере появления рабочего кода, а не пустым scaffold заранее.

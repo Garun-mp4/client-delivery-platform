@@ -5,6 +5,7 @@ packages:
 
 allowBuilds:
   esbuild: true
+  msgpackr-extract: false
   sharp: true
   unrs-resolver: true
 
@@ -34,6 +35,7 @@ catalog:
   '@aws-sdk/s3-request-presigner': 3.1087.0
   '@types/nodemailer': 7.0.4
   better-auth: 1.6.23
+  bullmq: 5.81.2
   drizzle-kit: 0.31.10
   drizzle-orm: 0.45.2
   eslint: 9.39.5

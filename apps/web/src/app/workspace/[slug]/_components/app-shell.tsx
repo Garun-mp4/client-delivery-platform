@@ -66,6 +66,7 @@ export function AppShell({
         <nav className="app-nav" aria-label="Основные разделы">
           <NavLink exact href={root} label={owner ? 'Обзор' : 'Главная'} />
           <NavLink href={`${root}/projects`} label="Проекты" />
+          <NavLink href={`${root}/notifications`} label="Уведомления" />
           {owner ? <NavLink href={`${root}/clients`} label="Клиенты" /> : null}
           <NavLink href={`${root}/access`} label={owner ? 'Доступ' : 'Сеансы'} />
         </nav>

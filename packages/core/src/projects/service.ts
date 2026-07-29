@@ -5,6 +5,7 @@ import {
   auditEvent,
   clientCompany,
   clientMembership,
+  outboxEvent,
   project,
   projectMembership,
   workspaceMembership,
@@ -321,6 +322,17 @@ export async function setProjectArchived(
       entityType: 'project',
       entityId: access.projectId,
       requestId: request.requestId,
+    });
+    await tx.insert(outboxEvent).values({
+      workspaceId: tenant.workspaceId,
+      eventType: archived ? 'project.archived' : 'project.restored',
+      aggregateType: 'project',
+      aggregateId: access.projectId,
+      payload: {
+        template: 'domain-event',
+        projectId: access.projectId,
+        entityType: 'project',
+      },
     });
   });
 }

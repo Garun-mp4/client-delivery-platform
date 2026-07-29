@@ -2143,6 +2143,180 @@ button:disabled {
     background: transparent;
   }
 }
+.notification-page,
+.completion-page {
+  display: grid;
+  gap: 2rem;
+}
+.notification-stream {
+  border-top: 1px solid var(--border-default);
+  padding-top: 1.5rem;
+}
+.notification-heading {
+  align-items: end;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.notification-list,
+.completion-gates ul,
+.handover-checklist ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.notification-list {
+  border-bottom: 1px solid var(--border-soft);
+}
+.notification-list li {
+  align-items: center;
+  border-top: 1px solid var(--border-soft);
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 7.5rem;
+  padding: 1.25rem 0;
+}
+.notification-list li.is-read {
+  opacity: 0.72;
+}
+.notification-copy {
+  align-items: start;
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: 0.55rem minmax(0, 1fr);
+}
+.notification-copy h3,
+.notification-copy p {
+  margin: 0;
+}
+.notification-copy h3 {
+  font-size: 1.05rem;
+  margin-bottom: 0.35rem;
+}
+.notification-meta {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.4rem !important;
+  text-transform: uppercase;
+}
+.notification-state {
+  background: var(--marker-green);
+  border-radius: 50%;
+  display: block;
+  height: 0.55rem;
+  margin-top: 0.45rem;
+  width: 0.55rem;
+}
+.is-read .notification-state {
+  background: var(--border-default);
+}
+.notification-actions {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+}
+.notification-empty {
+  display: grid;
+  gap: 0.35rem;
+  padding: 3rem 0;
+}
+.quiet-hours-fields {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.completion-gates {
+  border-top: 1px solid var(--border-default);
+  padding-top: 1.5rem;
+}
+.completion-gates ul {
+  margin-top: 1rem;
+}
+.completion-gates li {
+  align-items: center;
+  border-top: 1px solid var(--border-soft);
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 0.8rem minmax(0, 1fr) auto;
+  padding: 1.1rem 0;
+}
+.completion-gates h3,
+.completion-gates p {
+  margin: 0;
+}
+.gate-marker {
+  border: 2px solid var(--border-default);
+  border-radius: 50%;
+  height: 0.75rem;
+  width: 0.75rem;
+}
+.is-ready .gate-marker {
+  background: var(--marker-green);
+  border-color: var(--marker-green);
+}
+.handover-checklist ul {
+  margin-top: 1rem;
+}
+.handover-checklist li + li {
+  border-top: 1px solid var(--border-soft);
+}
+.handover-checklist form {
+  align-items: center;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 1rem 0;
+}
+.handover-checklist span {
+  display: grid;
+  gap: 0.2rem;
+}
+.completion-action {
+  align-items: end;
+  background: var(--ink-primary);
+  color: var(--surface-raised);
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.55fr);
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+}
+.completion-action h2 {
+  color: inherit;
+}
+.completion-action .eyebrow {
+  color: var(--surface-raised);
+}
+.completion-action form {
+  display: grid;
+  gap: 0.8rem;
+}
+
+@media (max-width: 720px) {
+  .notification-heading,
+  .notification-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .notification-list li,
+  .completion-gates li,
+  .handover-checklist form,
+  .completion-action,
+  .quiet-hours-fields {
+    grid-template-columns: 1fr;
+  }
+  .notification-actions {
+    display: flex;
+  }
+  .notification-actions a,
+  .notification-actions button,
+  .handover-checklist button {
+    min-height: 44px;
+    width: 100%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

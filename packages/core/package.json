@@ -8,6 +8,7 @@
     "./identity": "./src/identity/index.ts",
     "./approvals": "./src/approvals/index.ts",
     "./materials": "./src/materials/index.ts",
+    "./notifications": "./src/notifications/index.ts",
     "./projects": "./src/projects/index.ts",
     "./questionnaires": "./src/questionnaires/index.ts",
     "./review": "./src/review/index.ts",

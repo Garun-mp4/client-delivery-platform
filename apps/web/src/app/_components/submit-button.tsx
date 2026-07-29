@@ -10,6 +10,7 @@ export function SubmitButton({
   name,
   value,
   formNoValidate,
+  disabled = false,
 }: {
   readonly children: ReactNode;
   readonly pendingText?: string;
@@ -17,13 +18,14 @@ export function SubmitButton({
   readonly name?: string;
   readonly value?: string;
   readonly formNoValidate?: boolean;
+  readonly disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
   return (
     <button
-      aria-disabled={pending}
+      aria-disabled={pending || disabled}
       className={className}
-      disabled={pending}
+      disabled={pending || disabled}
       formNoValidate={formNoValidate}
       name={name}
       type="submit"

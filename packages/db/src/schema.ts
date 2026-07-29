@@ -37,6 +37,15 @@ export const outboxStatus = pgEnum('outbox_status', [
   'delivered',
   'failed',
 ]);
+export const notificationChannel = pgEnum('notification_channel', ['in_app', 'email']);
+export const notificationDeliveryStatus = pgEnum('notification_delivery_status', [
+  'pending',
+  'processing',
+  'delivered',
+  'failed',
+  'suppressed',
+]);
+export const reminderStatus = pgEnum('reminder_status', ['active', 'completed', 'cancelled']);
 export const clientCompanyStatus = pgEnum('client_company_status', ['active', 'archived']);
 export const clientMembershipRole = pgEnum('client_membership_role', ['primary', 'member']);
 export const projectStatus = pgEnum('project_status', [
@@ -473,6 +482,7 @@ export const project = pgTable(
     progressCompletedWeight: integer('progress_completed_weight').notNull().default(0),
     progressTotalWeight: integer('progress_total_weight').notNull().default(0),
     publishedAt: timestamp('published_at', { withTimezone: true, mode: 'date' }),
+    completedAt: timestamp('completed_at', { withTimezone: true, mode: 'date' }),
     archivedAt: timestamp('archived_at', { withTimezone: true, mode: 'date' }),
     ...timestamps,
   },
@@ -759,6 +769,11 @@ export const actionItem = pgTable(
       table.dueAt,
     ),
     index('action_item_project_status_due_idx').on(table.projectId, table.status, table.dueAt),
+    uniqueIndex('action_item_id_project_workspace_unique').on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
     check(
       'action_item_terminal_timestamps_check',
       sql`(${table.status} = 'done' AND ${table.completedAt} IS NOT NULL AND ${table.cancelledAt} IS NULL) OR (${table.status} = 'cancelled' AND ${table.cancelledAt} IS NOT NULL AND ${table.completedAt} IS NULL) OR (${table.status} IN ('open', 'in_progress') AND ${table.completedAt} IS NULL AND ${table.cancelledAt} IS NULL)`,
@@ -1929,6 +1944,181 @@ export const outboxEvent = pgTable(
   (table) => [
     index('outbox_dispatch_idx').on(table.status, table.availableAt),
     index('outbox_workspace_created_idx').on(table.workspaceId, table.createdAt),
+  ],
+);
+
+export interface NotificationMetadata {
+  readonly projectSlug?: string;
+  readonly sourceType?: string;
+  readonly reminderKind?: 'due_soon' | 'overdue';
+}
+
+export const notificationEvent = pgTable(
+  'notification_event',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspace.id, { onDelete: 'cascade' }),
+    projectId: uuid('project_id'),
+    recipientUserId: uuid('recipient_user_id').notNull(),
+    actorUserId: uuid('actor_user_id').references(() => user.id, { onDelete: 'set null' }),
+    sourceOutboxEventId: uuid('source_outbox_event_id').references(() => outboxEvent.id, {
+      onDelete: 'set null',
+    }),
+    eventType: text('event_type').notNull(),
+    entityType: text('entity_type').notNull(),
+    entityId: uuid('entity_id').notNull(),
+    dedupeKey: text('dedupe_key').notNull(),
+    deepLinkPath: text('deep_link_path').notNull(),
+    metadata: jsonb('metadata').$type<NotificationMetadata>().notNull().default({}),
+    readAt: timestamp('read_at', { withTimezone: true, mode: 'date' }),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [project.id, project.workspaceId],
+      name: 'notification_event_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.recipientUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'notification_event_recipient_workspace_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('notification_event_id_workspace_unique').on(table.id, table.workspaceId),
+    uniqueIndex('notification_event_recipient_dedupe_unique').on(
+      table.recipientUserId,
+      table.dedupeKey,
+    ),
+    index('notification_event_recipient_read_created_idx').on(
+      table.workspaceId,
+      table.recipientUserId,
+      table.readAt,
+      table.createdAt,
+    ),
+    index('notification_event_project_created_idx').on(table.projectId, table.createdAt),
+    check('notification_event_deep_link_relative_check', sql`${table.deepLinkPath} LIKE '/%'`),
+  ],
+);
+
+export const notificationDelivery = pgTable(
+  'notification_delivery',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    notificationEventId: uuid('notification_event_id').notNull(),
+    channel: notificationChannel('channel').notNull(),
+    status: notificationDeliveryStatus('status').notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    availableAt: timestamp('available_at', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    lockedAt: timestamp('locked_at', { withTimezone: true, mode: 'date' }),
+    deliveredAt: timestamp('delivered_at', { withTimezone: true, mode: 'date' }),
+    lastErrorCode: text('last_error_code'),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.notificationEventId, table.workspaceId],
+      foreignColumns: [notificationEvent.id, notificationEvent.workspaceId],
+      name: 'notification_delivery_event_workspace_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('notification_delivery_event_channel_unique').on(
+      table.notificationEventId,
+      table.channel,
+    ),
+    index('notification_delivery_dispatch_idx').on(table.status, table.availableAt, table.channel),
+  ],
+);
+
+export const notificationPreference = pgTable(
+  'notification_preference',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    userId: uuid('user_id').notNull(),
+    emailEnabled: boolean('email_enabled').notNull().default(true),
+    remindersEnabled: boolean('reminders_enabled').notNull().default(true),
+    timezone: text('timezone').notNull().default('Europe/Moscow'),
+    quietHoursStartMinute: integer('quiet_hours_start_minute'),
+    quietHoursEndMinute: integer('quiet_hours_end_minute'),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.workspaceId, table.userId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'notification_preference_workspace_user_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('notification_preference_workspace_user_unique').on(
+      table.workspaceId,
+      table.userId,
+    ),
+    check(
+      'notification_preference_quiet_hours_check',
+      sql`(${table.quietHoursStartMinute} IS NULL AND ${table.quietHoursEndMinute} IS NULL) OR (${table.quietHoursStartMinute} BETWEEN 0 AND 1439 AND ${table.quietHoursEndMinute} BETWEEN 0 AND 1439 AND ${table.quietHoursStartMinute} <> ${table.quietHoursEndMinute})`,
+    ),
+  ],
+);
+
+export const actionReminder = pgTable(
+  'action_reminder',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    actionItemId: uuid('action_item_id').notNull(),
+    recipientUserId: uuid('recipient_user_id').notNull(),
+    status: reminderStatus('status').notNull().default('active'),
+    lastKind: text('last_kind'),
+    lastSentAt: timestamp('last_sent_at', { withTimezone: true, mode: 'date' }),
+    nextRunAt: timestamp('next_run_at', { withTimezone: true, mode: 'date' }).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.actionItemId, table.projectId, table.workspaceId],
+      foreignColumns: [actionItem.id, actionItem.projectId, actionItem.workspaceId],
+      name: 'action_reminder_action_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.recipientUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'action_reminder_recipient_workspace_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('action_reminder_action_recipient_unique').on(
+      table.actionItemId,
+      table.recipientUserId,
+    ),
+    index('action_reminder_due_idx').on(table.status, table.nextRunAt),
+  ],
+);
+
+export const projectHandoverChecklistItem = pgTable(
+  'project_handover_checklist_item',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    itemKey: text('item_key').notNull(),
+    label: text('label').notNull(),
+    required: boolean('required').notNull().default(true),
+    completedAt: timestamp('completed_at', { withTimezone: true, mode: 'date' }),
+    completedByUserId: uuid('completed_by_user_id').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [project.id, project.workspaceId],
+      name: 'handover_checklist_project_workspace_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('handover_checklist_project_key_unique').on(table.projectId, table.itemKey),
+    index('handover_checklist_project_completed_idx').on(table.projectId, table.completedAt),
   ],
 );
 
