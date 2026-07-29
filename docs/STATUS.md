@@ -139,6 +139,10 @@ Milestone 10 не начинался.
 - Два integration запуска были некорректно начаты без полного `TEST_*` окружения и с неверным
   локальным паролем; тесты безопасно отказались работать. Повтор выполнен с документированным
   Compose-окружением и прошёл полностью.
+- Первый CI Milestone 09 подтвердил все 39 integration assertions, но cleanup нового suite нарушил
+  намеренный `RESTRICT` immutable approval history при удалении тестового workspace. Cleanup теперь
+  явно удаляет tenant-scoped approval requests до workspace; production delete semantics не
+  ослаблялись.
 
 ## Принятые решения
 

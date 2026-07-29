@@ -143,6 +143,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await client.db.delete(approvalRequest).where(eq(approvalRequest.workspaceId, workspaceAId));
+  await client.db.delete(approvalRequest).where(eq(approvalRequest.workspaceId, workspaceBId));
   await client.db.delete(workspace).where(eq(workspace.id, workspaceAId));
   await client.db.delete(workspace).where(eq(workspace.id, workspaceBId));
   await client.db.delete(user).where(
