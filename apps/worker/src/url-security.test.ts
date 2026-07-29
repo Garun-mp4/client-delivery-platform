@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { checkSiteUrl, isBlockedAddress, normalizeCheckedUrl } from './url-security';
+import {
+  checkSiteUrl,
+  fetchSafeResource,
+  isBlockedAddress,
+  normalizeCheckedUrl,
+} from './url-security';
 
 describe('SSRF URL boundary', () => {
   it.each([
@@ -53,5 +58,14 @@ describe('SSRF URL boundary', () => {
       }),
     ).rejects.toThrow('URL_ADDRESS_BLOCKED');
     expect(requested).toBe(false);
+  });
+
+  it('blocks renderer resources before opening a socket to a private address', async () => {
+    await expect(
+      fetchSafeResource('https://assets.example/internal.js', {
+        maxBytes: 1024,
+        resolve: async () => ['169.254.169.254'],
+      }),
+    ).rejects.toThrow('URL_ADDRESS_BLOCKED');
   });
 });

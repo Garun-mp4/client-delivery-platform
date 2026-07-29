@@ -71,7 +71,7 @@ export function normalizeCheckedUrl(raw: string): URL {
   return url;
 }
 
-async function safeAddress(
+export async function safeAddress(
   hostname: string,
   resolver: (hostname: string) => Promise<readonly string[]>,
 ) {
@@ -85,6 +85,84 @@ async function safeAddress(
     throw new Error('URL_ADDRESS_BLOCKED');
   }
   return addresses[0]!;
+}
+
+export interface SafeResource {
+  readonly status: number;
+  readonly headers: Readonly<Record<string, string>>;
+  readonly body: Uint8Array;
+}
+
+export async function fetchSafeResource(
+  raw: string,
+  options: {
+    readonly maxBytes: number;
+    readonly timeoutMs?: number;
+    readonly resolve?: (hostname: string) => Promise<readonly string[]>;
+  },
+): Promise<SafeResource> {
+  const url = normalizeCheckedUrl(raw);
+  const resolver =
+    options.resolve ??
+    (async (hostname: string) =>
+      (await lookup(hostname, { all: true, verbatim: true })).map((item) => item.address));
+  const address = await safeAddress(url.hostname, resolver);
+  return new Promise((resolve, reject) => {
+    const request = (url.protocol === 'https:' ? httpsRequest : httpRequest)(
+      {
+        protocol: url.protocol,
+        hostname: address,
+        port: url.port || undefined,
+        path: `${url.pathname}${url.search}`,
+        method: 'GET',
+        servername: url.hostname,
+        headers: {
+          host: url.host,
+          'user-agent': 'Garun-Workspace-Cover-Renderer/1.0',
+          accept: '*/*',
+          'accept-encoding': 'identity',
+        },
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        let size = 0;
+        response.on('data', (chunk: Buffer) => {
+          size += chunk.length;
+          if (size > options.maxBytes) {
+            response.destroy(new Error('URL_RESPONSE_TOO_LARGE'));
+            return;
+          }
+          chunks.push(chunk);
+        });
+        response.once('error', reject);
+        response.once('end', () => {
+          const first = (value: string | string[] | undefined) =>
+            Array.isArray(value) ? value[0] : value;
+          const headers: Record<string, string> = {};
+          for (const name of [
+            'content-type',
+            'location',
+            'cache-control',
+            'content-security-policy',
+            'access-control-allow-origin',
+          ]) {
+            const value = first(response.headers[name]);
+            if (value) headers[name] = value;
+          }
+          resolve({
+            status: response.statusCode ?? 502,
+            headers,
+            body: Buffer.concat(chunks),
+          });
+        });
+      },
+    );
+    request.setTimeout(options.timeoutMs ?? TIMEOUT_MS, () =>
+      request.destroy(new Error('URL_TIMEOUT')),
+    );
+    request.once('error', reject);
+    request.end();
+  });
 }
 
 function requestHeaders(url: URL, address: string) {

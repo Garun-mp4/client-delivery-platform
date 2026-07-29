@@ -84,6 +84,9 @@ catalogs:
     pino:
       specifier: 10.3.1
       version: 10.3.1
+    playwright-core:
+      specifier: 1.61.1
+      version: 1.61.1
     prettier:
       specifier: 3.9.5
       version: 3.9.5
@@ -251,6 +254,9 @@ importers:
       pino:
         specifier: 'catalog:'
         version: 10.3.1
+      playwright-core:
+        specifier: 'catalog:'
+        version: 1.61.1
       sharp:
         specifier: 0.35.3
         version: 0.35.3(@types/node@22.20.1)

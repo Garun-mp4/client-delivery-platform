@@ -187,6 +187,13 @@ export const urlAvailabilityStatus = pgEnum('url_availability_status', [
   'reachable',
   'unreachable',
 ]);
+export const projectCoverKind = pgEnum('project_cover_kind', ['manual', 'automatic']);
+export const projectCoverCaptureStatus = pgEnum('project_cover_capture_status', [
+  'pending',
+  'processing',
+  'succeeded',
+  'failed',
+]);
 export const siteEmbedStatus = pgEnum('site_embed_status', ['unknown', 'allowed', 'blocked']);
 export const feedbackStatus = pgEnum('feedback_status', [
   'new',
@@ -1368,6 +1375,113 @@ export const siteVersionCheckAttempt = pgTable(
     index('site_version_attempt_cycle_idx').on(table.siteVersionId, table.attempt),
     index('site_version_attempt_project_checked_idx').on(table.projectId, table.checkedAt),
     check('site_version_attempt_positive_check', sql`${table.attempt} > 0`),
+  ],
+);
+
+export const projectCoverAsset = pgTable(
+  'project_cover_asset',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    kind: projectCoverKind('kind').notNull(),
+    fileObjectId: uuid('file_object_id').notNull(),
+    sourceSiteVersionId: uuid('source_site_version_id'),
+    createdByUserId: uuid('created_by_user_id').notNull(),
+    isCurrent: boolean('is_current').notNull().default(false),
+    supersededAt: timestamp('superseded_at', { withTimezone: true, mode: 'date' }),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.projectId, table.workspaceId],
+      foreignColumns: [project.id, project.workspaceId],
+      name: 'project_cover_asset_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.fileObjectId, table.projectId, table.workspaceId],
+      foreignColumns: [fileObject.id, fileObject.projectId, fileObject.workspaceId],
+      name: 'project_cover_asset_file_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.sourceSiteVersionId, table.projectId, table.workspaceId],
+      foreignColumns: [siteVersion.id, siteVersion.projectId, siteVersion.workspaceId],
+      name: 'project_cover_asset_version_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.createdByUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'project_cover_asset_creator_workspace_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('project_cover_asset_current_kind_unique')
+      .on(table.projectId, table.kind)
+      .where(sql`${table.isCurrent} = true`),
+    uniqueIndex('project_cover_asset_file_unique').on(table.fileObjectId),
+    uniqueIndex('project_cover_asset_id_project_workspace_unique').on(
+      table.id,
+      table.projectId,
+      table.workspaceId,
+    ),
+    index('project_cover_asset_project_created_idx').on(
+      table.projectId,
+      table.kind,
+      table.createdAt,
+    ),
+    check(
+      'project_cover_asset_source_check',
+      sql`(${table.kind} = 'manual' AND ${table.sourceSiteVersionId} IS NULL) OR (${table.kind} = 'automatic' AND ${table.sourceSiteVersionId} IS NOT NULL)`,
+    ),
+    check(
+      'project_cover_asset_current_check',
+      sql`(${table.isCurrent} = true AND ${table.supersededAt} IS NULL) OR ${table.isCurrent} = false`,
+    ),
+  ],
+);
+
+export const projectCoverCapture = pgTable(
+  'project_cover_capture',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id').notNull(),
+    projectId: uuid('project_id').notNull(),
+    siteVersionId: uuid('site_version_id').notNull(),
+    requestedByUserId: uuid('requested_by_user_id').notNull(),
+    resultAssetId: uuid('result_asset_id').references(() => projectCoverAsset.id, {
+      onDelete: 'set null',
+    }),
+    status: projectCoverCaptureStatus('status').notNull().default('pending'),
+    idempotencyKey: text('idempotency_key').notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .defaultNow(),
+    processingStartedAt: timestamp('processing_started_at', { withTimezone: true, mode: 'date' }),
+    completedAt: timestamp('completed_at', { withTimezone: true, mode: 'date' }),
+    failureCode: text('failure_code'),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.siteVersionId, table.projectId, table.workspaceId],
+      foreignColumns: [siteVersion.id, siteVersion.projectId, siteVersion.workspaceId],
+      name: 'project_cover_capture_version_project_workspace_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.workspaceId, table.requestedByUserId],
+      foreignColumns: [workspaceMembership.workspaceId, workspaceMembership.userId],
+      name: 'project_cover_capture_requester_workspace_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('project_cover_capture_idempotency_unique').on(
+      table.workspaceId,
+      table.idempotencyKey,
+    ),
+    index('project_cover_capture_queue_idx').on(table.status, table.nextAttemptAt, table.createdAt),
+    index('project_cover_capture_project_created_idx').on(table.projectId, table.createdAt),
+    check('project_cover_capture_attempts_check', sql`${table.attempts} >= 0`),
+    check(
+      'project_cover_capture_completion_check',
+      sql`(${table.status} = 'succeeded' AND ${table.resultAssetId} IS NOT NULL AND ${table.completedAt} IS NOT NULL AND ${table.failureCode} IS NULL) OR (${table.status} = 'failed' AND ${table.resultAssetId} IS NULL AND ${table.completedAt} IS NOT NULL AND ${table.failureCode} IS NOT NULL) OR (${table.status} IN ('pending', 'processing') AND ${table.resultAssetId} IS NULL AND ${table.completedAt} IS NULL)`,
+    ),
   ],
 );
 

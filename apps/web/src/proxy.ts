@@ -7,9 +7,12 @@ function createContentSecurityPolicy(nonce: string): string {
   const publicProtocol = process.env.PUBLIC_APP_URL
     ? new URL(process.env.PUBLIC_APP_URL).protocol
     : 'http:';
-  const storageOrigin = process.env.STORAGE_PUBLIC_ENDPOINT
-    ? new URL(process.env.STORAGE_PUBLIC_ENDPOINT).origin
-    : null;
+  const storageEndpoint =
+    process.env.STORAGE_PUBLIC_ENDPOINT ??
+    (process.env.APP_ENV === 'local' || process.env.APP_ENV === 'test'
+      ? 'http://127.0.0.1:9000'
+      : null);
+  const storageOrigin = storageEndpoint ? new URL(storageEndpoint).origin : null;
   const directives = [
     "default-src 'self'",
     "base-uri 'self'",

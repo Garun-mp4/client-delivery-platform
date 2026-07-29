@@ -25,6 +25,7 @@
     "nodemailer": "catalog:",
     "pg": "catalog:",
     "pino": "catalog:",
+    "playwright-core": "catalog:",
     "sharp": "catalog:"
   },
   "devDependencies": {
