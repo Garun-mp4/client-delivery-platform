@@ -32,7 +32,7 @@ test('owner publishes one project and grants then revokes explicit client access
   page,
   request,
 }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
   const suffix = `${Date.now()}-${test.info().workerIndex}`;
   const ownerEmail = process.env.E2E_OWNER_EMAIL ?? 'e2e-owner@example.test';
   const ownerPassword = process.env.E2E_OWNER_PASSWORD ?? 'E2eOwnerPassword-2026!';
@@ -59,9 +59,7 @@ test('owner publishes one project and grants then revokes explicit client access
   await expect(page.getByRole('heading', { name: companyName })).toBeVisible();
 
   await page.goto('/workspace/e2e-studio/projects');
-  if (!(await page.getByLabel('Название проекта').isVisible())) {
-    await page.locator('summary').filter({ hasText: 'Создать черновик' }).click();
-  }
+  await page.getByRole('link', { name: 'Создать проект' }).click();
   await page.getByLabel('Название проекта').fill(projectName);
   await page.getByLabel('Адрес проекта').fill(projectSlug);
   await page.getByLabel('Компания клиента').selectOption({ label: companyName });
@@ -70,6 +68,51 @@ test('owner publishes one project and grants then revokes explicit client access
   await page.getByLabel('Описание').fill('Описание, доступное клиенту.');
   await page.getByRole('button', { name: 'Создать черновик' }).click();
   await expect(page).toHaveURL(new RegExp(`/projects/${projectSlug}`));
+  await page.getByLabel('Выбрать изображение').setInputFiles({
+    name: 'cover.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVQImWMQT/LHihiGlgQAe+UyAZKv9zQAAAAASUVORK5CYII=',
+      'base64',
+    ),
+  });
+  await page.getByRole('button', { name: 'Загрузить обложку' }).click();
+  await expect(page.getByText('Изображение проверяется.')).toBeVisible();
+  await expect
+    .poll(
+      async () =>
+        (
+          await page.request.get(`/api/workspaces/e2e-studio/projects/${projectSlug}/cover`)
+        ).status(),
+      { timeout: 30_000 },
+    )
+    .toBe(200);
+  await page.reload();
+  await expect(page.getByAltText('Текущая обложка проекта')).toBeVisible();
+  await page.goto('/workspace/e2e-studio/projects');
+  await expect(page.getByRole('heading', { name: 'Проекты', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: projectName })).toBeVisible();
+  await expect(page.getByAltText(`Обложка проекта «${projectName}»`)).toBeVisible();
+  await page.getByRole('link', { name: 'Компактно' }).click();
+  await expect(page).toHaveURL(/view=compact/);
+  await page.getByLabel('Найти проект или клиента').fill('ничего-не-найти');
+  await page.getByRole('button', { name: 'Применить' }).click();
+  await expect(page.getByRole('heading', { name: 'Измените запрос или фильтр' })).toBeVisible();
+  await page.getByRole('link', { name: 'Сбросить фильтры' }).click();
+  const catalogAccessibility = await new AxeBuilder({ page }).analyze();
+  expect(catalogAccessibility.violations).toEqual([]);
+  await page.getByRole('heading', { name: projectName }).click();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Удалить ручную' }).click();
+  await expect(page.getByText('Ручная обложка удалена.')).toBeVisible();
+  await page.goto('/workspace/e2e-studio/projects');
+  await expect(
+    page
+      .locator('.catalog-project-main')
+      .filter({ hasText: projectName })
+      .getByText('Обложка пока не добавлена'),
+  ).toBeVisible();
+  await page.getByRole('heading', { name: projectName }).click();
 
   await page.getByRole('link', { name: 'Посмотреть глазами клиента' }).click();
   await expect(page.getByText('Предпросмотр клиентского интерфейса')).toBeVisible();

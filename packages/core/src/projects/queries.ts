@@ -98,9 +98,11 @@ export async function listProjects(database: DatabaseClient['db'], tenant: Tenan
         name: project.name,
         status: project.status,
         plannedEndDate: project.plannedEndDate,
+        updatedAt: project.updatedAt,
         companyName: clientCompany.name,
         role: projectMembership.role,
         side: projectMembership.side,
+        permissions: projectMembership.permissions,
       })
       .from(project)
       .innerJoin(clientCompany, eq(clientCompany.id, project.clientCompanyId))
@@ -123,9 +125,11 @@ export async function listProjects(database: DatabaseClient['db'], tenant: Tenan
       name: project.name,
       status: project.status,
       plannedEndDate: project.plannedEndDate,
+      updatedAt: project.updatedAt,
       companyName: clientCompany.name,
       role: projectMembership.role,
       side: projectMembership.side,
+      permissions: projectMembership.permissions,
     })
     .from(projectMembership)
     .innerJoin(

@@ -469,6 +469,36 @@ production artifact. Исключение ограничено одним GHSA �
 несовместим с используемым официальным React plugin. Точечное документированное исключение не
 скрывает runtime advisories и сохраняет рабочие обязательные проверки.
 
+### ADR-043. Приватные project covers и SSRF-safe browser renderer
+
+**Решение:** каталог использует единый вычисленный источник обложки:
+последняя clean/available ручная обложка, затем последний успешный автоматический снимок, затем
+пустая область с dashed border. Объекты остаются приватными и читаются только через same-origin
+endpoint после session, tenant и project policy. Новая ручная загрузка активируется лишь после
+существующего quarantine/ClamAV/Sharp-контура; предыдущая обложка до этого не меняется.
+
+Автоматический снимок разрешён только для последней опубликованной client-visible public
+`SiteVersion` со свежими `safe/reachable` статусами. Задание идемпотентно и выполняется существующим
+worker. `ProjectCoverRenderer` является adapter; локальная реализация использует закреплённый
+`playwright-core@1.61.1` и Chromium из worker image. Browser context не получает cookies, пароли или
+credentials. Его document, redirect и subresource запросы не выходят в сеть напрямую: route
+fulfillment использует существующий DNS/IP validation и IP-pinned transport. Chromium запускается
+non-root с заблокированными service worker/WebSocket/download/QUIC/direct DNS и лимитами времени,
+запросов и общего объёма. Docker Desktop блокирует namespace sandbox non-root Chromium; вместо
+выдачи контейнеру опасного `SYS_ADMIN` локальный adapter полагается на container boundary и
+перехваченный network. Production worker должен запускаться в отдельном hardened browser sandbox
+runtime. В логах допустимы только workspace/project/job ID и безопасный failure code.
+
+**Альтернативы:** публичные object URLs; screenshot SaaS; прямой browser network после проверки
+главного URL; периодический cron; хранение только одного asset; синхронный capture в web request;
+ручной upload со стороны клиента.
+
+**Причина:** private delivery и повторная policy-проверка сохраняют tenant isolation. Перехват
+каждого browser request закрывает redirect/subresource SSRF и DNS rebinding. Adapter позволяет
+сменить renderer, а локальный Chromium исключает платный provider. `playwright-core` — единственная
+новая production-зависимость: без browser engine нельзя получить реальный first-viewport render
+современного сайта; Sharp и storage уже присутствуют.
+
 ## 5. Планируемая структура репозитория
 
 Каталоги создаются по мере появления рабочего кода, а не пустым scaffold заранее.

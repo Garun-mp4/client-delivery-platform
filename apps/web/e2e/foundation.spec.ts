@@ -54,6 +54,7 @@ test('uses a nonce-based production content security policy', async ({ page }) =
   expect(policy).not.toContain("'unsafe-inline'");
   expect(policy).not.toContain("'unsafe-eval'");
   expect(policy).toMatch(/script-src 'self' 'nonce-[A-Za-z0-9-]+' 'strict-dynamic'/);
+  expect(policy).toContain("connect-src 'self' http://127.0.0.1:9000");
 
   const scriptNonces = await page
     .locator('script[nonce]')
