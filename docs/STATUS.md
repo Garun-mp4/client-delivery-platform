@@ -2,7 +2,7 @@
 
 Последнее обновление: 2026-08-01
 Общий статус: Milestones 00–10 и UX stabilization 06.5 объединены с `main`; бесплатный hybrid
-staging разворачивается для внутреннего rehearsal
+staging готов для внутренней проверки web-потока, но не для внешнего клиентского пилота
 
 ## Текущий milestone
 
@@ -89,13 +89,23 @@ Upstash Redis; worker, Mailpit и ClamAV намеренно остаются л�
 - Создана migration `0018` для `export_job`, ADR-047–048 и документация экспорта/передачи.
 - Финальный review исправил SQL bind для project-wide notification events; зависшие локальные
   outbox-события повторно обработаны и перешли в `delivered`.
+- Бесплатный hybrid staging развёрнут без карты: публичный Vercel web использует отдельные
+  Supabase PostgreSQL/private S3 и Upstash Redis; liveness и readiness подтверждают готовность всех
+  трёх внешних зависимостей.
+- Все migrations `0000`–`0018` применены к staging. Непубличный bootstrap создал отдельного
+  демонстрационного owner, workspace, active owner membership и audit event; реальный password
+  login создал session и открыл защищённый workspace.
+- Локальные Mailpit и ClamAV запущены через Compose и healthy. Внешние credentials находятся только
+  в provider environment, не добавлены в Git; первоначально раскрытые setup credentials были
+  отозваны и заменены.
 
 ## Текущие задачи
 
-- Подготовить реальные staging credentials/configuration только после выбора и создания внешней
-  инфраструктуры владельцем проекта.
-- Провести smoke, backup/restore drill и пилотный клиентский проект на staging по
-  `docs/PILOT_RUNBOOK.md`.
+- Провести внутренний rehearsal бизнес-пути на staging по `docs/PILOT_RUNBOOK.md`, не приглашая
+  внешнего клиента и не загружая реальные персональные данные.
+- Выбрать always-on worker/scanner и реальный email provider до любого внешнего пилота. Бесплатная
+  текущая схема не обеспечивает надёжную фоновую обработку.
+- Провести отдельный staging backup/restore drill и настроить alerts перед go/no-go.
 - Не начинать Milestone 11 до завершения внешнего release gate или отдельного решения владельца.
 
 ## Найденные проблемы
@@ -292,12 +302,20 @@ Upstash Redis; worker, Mailpit и ClamAV намеренно остаются л�
   ADR-042, активных runtime advisories нет. Secret scan прошёл для 413 tracked/untracked файлов.
 - Feature CI `30487810446` для commit `43470e6` успешно выполнил quality, migration, security,
   performance, build, browser/a11y, secret scan и smoke gates перед fast-forward merge в `main`.
+- Hybrid staging: `pnpm install --frozen-lockfile`, format check, lint, strict typecheck, unit suites,
+  production web/worker build, artifact verification, secret audit и `git diff --check` прошли.
+  Vercel `/api/health/live` и `/api/health/ready` вернули 200; readiness сообщил `database`, `redis`
+  и `storage` = `ok`. Compose подтвердил healthy Mailpit и ClamAV.
+- Staging bootstrap проверен отдельным read-only SQL-запросом: одна active owner membership,
+  password account и audit event существуют. Browser smoke подтвердил password login,
+  database-backed session и защищённый `/workspace/demo-studio`.
 
 ## Следующие действия
 
-1. Завершить preview deployment ветки hybrid staging и проверить readiness из Vercel.
-2. Запустить локальные worker/Mailpit/ClamAV с внешними staging dependencies и пройти rehearsal.
-3. До внешнего клиента утвердить always-on worker/scanner, реальный email provider, backup и alerts.
+1. Внутренне проверить каталог, создание тестового клиента/проекта и access policies без реальных
+   клиентских данных.
+2. До внешнего клиента утвердить always-on worker/scanner, реальный email provider, backup и alerts.
+3. Выполнить полный staging rehearsal фоновых сценариев после развёртывания worker.
 4. После внешней приёмки зафиксировать go/no-go; Milestone 11 не начинать автоматически.
 
 ## Известные ограничения
@@ -325,6 +343,10 @@ Upstash Redis; worker, Mailpit и ClamAV намеренно остаются л�
 - Бесплатный hybrid staging не production-like: Vercel/Supabase/Upstash созданы без карты, но
   worker, Mailpit и ClamAV доступны только с компьютера разработчика; внешний клиентский pilot ещё
   не разрешён.
+- Локальный Node worker не подключён к внешнему staging: TCP endpoints доступны, но TLS-сессия к
+  Supabase с этой машины сбрасывается до выполнения запроса. TLS verification не ослаблялась;
+  migrations и bootstrap выполнены через авторизованный Supabase SQL Editor. До развёртывания
+  always-on worker email, scan, screenshot, notification и export jobs на staging не обслуживаются.
 - Supabase Free ограничивает текущую среду 50 000 000 bytes на файл и 1 000 000 000 bytes на
   workspace; продуктовые defaults 100 MiB/10 GiB не изменены.
 - Prometheus-compatible metrics доступны на worker endpoint, но внешний collector/dashboard/alerts

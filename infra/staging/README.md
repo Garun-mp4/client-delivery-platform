@@ -18,6 +18,18 @@ Production provider и account по-прежнему не утверждены. 
 - browser renderer запускается non-root в отдельном hardened sandbox без direct network;
 - backup/restore, metrics/alerts и post-deploy smoke обязательны до пилотного приглашения.
 
+## Текущий внутренний стенд
+
+- web: `https://client-delivery-platform-web.vercel.app`;
+- liveness: `/api/health/live`;
+- readiness: `/api/health/ready`;
+- workspace для внутренней проверки: `demo-studio`;
+- локальный Mailpit: `http://127.0.0.1:8025`.
+
+Демонстрационный owner создан, но его пароль намеренно не записан в Git или документацию. Текущая
+браузерная session используется для внутренней проверки; постоянный пароль следует отдельно
+сменить на выбранный владельцем перед передачей доступа другому человеку.
+
 ## Порядок запуска hybrid worker
 
 1. Запустить локальные Mailpit и ClamAV: `docker compose up -d mailpit clamav`.
@@ -31,3 +43,8 @@ Production provider и account по-прежнему не утверждены. 
 Пока локальный worker остановлен, письма, quarantine scan, exports, notifications и capture jobs
 останутся в очереди. Такая среда годится для внутреннего rehearsal, но не для приглашения внешнего
 клиента. Source of truth — `docs/DEPLOYMENT.md` и `docs/PILOT_RUNBOOK.md`.
+
+На текущей Windows-машине прямой TLS-сеанс Node.js к staging Supabase сбрасывается до SQL-запроса,
+хотя TCP endpoint доступен. Проверка сертификата не отключается. Поэтому локальный worker нельзя
+считать подключённым к staging до устранения сетевого ограничения или размещения worker у
+совместимого контейнерного провайдера.
