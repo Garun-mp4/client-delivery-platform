@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseProductConfig, parseWebEnv } from './index';
+import { parseDatabaseEnv, parseProductConfig, parseWebEnv } from './index';
 
 describe('runtime configuration', () => {
   it('provides documented product defaults without production secrets', () => {
@@ -61,5 +61,28 @@ describe('runtime configuration', () => {
     } catch (error) {
       expect(String(error)).not.toContain(secretValue);
     }
+  });
+
+  it('validates an optional PostgreSQL CA certificate', () => {
+    expect(() =>
+      parseDatabaseEnv({
+        DATABASE_URL: 'postgresql://database.example.test/app',
+        DATABASE_SSL_CA: 'not-a-certificate',
+      }),
+    ).toThrow(/DATABASE_SSL_CA/);
+
+    expect(
+      parseDatabaseEnv({
+        DATABASE_URL: 'postgresql://database.example.test/app',
+        DATABASE_SSL_CA: '-----BEGIN CERTIFICATE-----\nexample\n-----END CERTIFICATE-----',
+      }).DATABASE_SSL_CA,
+    ).toContain('BEGIN CERTIFICATE');
+
+    expect(
+      parseDatabaseEnv({
+        DATABASE_URL: 'postgresql://database.example.test/app',
+        DATABASE_SSL_CA: '',
+      }).DATABASE_SSL_CA,
+    ).toBeUndefined();
   });
 });

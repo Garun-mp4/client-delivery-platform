@@ -1,16 +1,17 @@
 # Статус реализации
 
-Последнее обновление: 2026-07-29
-Общий статус: Milestones 00–10 и UX stabilization 06.5 объединены с `main`; внешний
-staging/pilot ожидает инфраструктуру
+Последнее обновление: 2026-08-01
+Общий статус: Milestones 00–10 и UX stabilization 06.5 объединены с `main`; бесплатный hybrid
+staging разворачивается для внутреннего rehearsal
 
 ## Текущий milestone
 
 **Milestone 10 — production readiness и первый пилот: инженерная часть объединена с `main`.**
 Экспорт истории, observability, backup/restore, performance/security automation и pilot runbook
 готовы. Feature CI `30487810446` завершён успешно. Внешняя приёмка требует развёртывания
-предварительно выбранной production-like инфраструктуры и проведения реального пилота; домен,
-платные сервисы и production secrets не создавались.
+предварительно выбранной production-like инфраструктуры и проведения реального пилота. Созданы
+отдельные бесплатные staging resources без карты: Vercel web, Supabase PostgreSQL/private S3 и
+Upstash Redis; worker, Mailpit и ClamAV намеренно остаются локальными.
 
 ## Завершённые задачи
 
@@ -294,10 +295,10 @@ staging/pilot ожидает инфраструктуру
 
 ## Следующие действия
 
-1. Создать production-like staging только после подтверждения провайдеров, домена и бюджета.
-2. Настроить внешние secrets/backup destination/alerts и выполнить staging deployment checklist.
-3. Провести один реальный пилот, собрать обратную связь и зафиксировать go/no-go.
-4. После внешней приёмки зафиксировать результат пилота; Milestone 11 не начинать автоматически.
+1. Завершить preview deployment ветки hybrid staging и проверить readiness из Vercel.
+2. Запустить локальные worker/Mailpit/ClamAV с внешними staging dependencies и пройти rehearsal.
+3. До внешнего клиента утвердить always-on worker/scanner, реальный email provider, backup и alerts.
+4. После внешней приёмки зафиксировать go/no-go; Milestone 11 не начинать автоматически.
 
 ## Известные ограничения
 
@@ -321,8 +322,11 @@ staging/pilot ожидает инфраструктуру
 - Нет digest, push/Telegram, notification analytics и отдельного admin UI для failed BullMQ jobs.
 - Completion gate не учитывает оплату до появления включённого payment module; это соответствует
   утверждённому условному финансовому gate.
-- Production domain, Vercel/Railway/R2/Resend accounts, production scanner, monitoring destination
-  и секреты отсутствуют; staging deployment и реальный pilot этим репозиторием не симулируются.
+- Бесплатный hybrid staging не production-like: Vercel/Supabase/Upstash созданы без карты, но
+  worker, Mailpit и ClamAV доступны только с компьютера разработчика; внешний клиентский pilot ещё
+  не разрешён.
+- Supabase Free ограничивает текущую среду 50 000 000 bytes на файл и 1 000 000 000 bytes на
+  workspace; продуктовые defaults 100 MiB/10 GiB не изменены.
 - Prometheus-compatible metrics доступны на worker endpoint, но внешний collector/dashboard/alerts
   появятся только при развёртывании инфраструктуры.
 - Экспорт — point-in-time snapshot, а не юридически заверенная подпись или неизменяемый архив;

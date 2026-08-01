@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "tsx src/migrate.ts",
     "seed:pilot": "tsx --env-file-if-exists=.env src/seed-pilot.ts"
   },
   "dependencies": {

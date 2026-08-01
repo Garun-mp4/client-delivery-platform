@@ -25,6 +25,19 @@ const databaseShape = {
     .refine((value) => value.startsWith('postgres://') || value.startsWith('postgresql://'), {
       message: 'DATABASE_URL must use postgres:// or postgresql://',
     }),
+  DATABASE_SSL_CA: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z
+      .string()
+      .trim()
+      .refine(
+        (value) =>
+          value.startsWith('-----BEGIN CERTIFICATE-----') &&
+          value.endsWith('-----END CERTIFICATE-----'),
+        { message: 'DATABASE_SSL_CA must contain a PEM certificate' },
+      )
+      .optional(),
+  ),
 } as const;
 
 const redisShape = {
