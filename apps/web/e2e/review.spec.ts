@@ -72,10 +72,10 @@ test('owner publishes a checked version and client closes structured feedback', 
   await page.getByRole('button', { name: 'Отправить приглашение' }).click();
 
   await page.getByRole('link', { name: 'Проверка' }).click();
-  await page.locator('summary').filter({ hasText: 'Опубликовать обновление' }).click();
+  await page.locator('summary').filter({ hasText: 'Добавить запись в ленту' }).click();
   await page.getByLabel('Заголовок').fill('Собрана версия для проверки');
   await page.getByLabel('Что изменилось').fill('Готова главная страница.');
-  await page.getByRole('button', { name: 'Опубликовать' }).click();
+  await page.getByRole('button', { name: 'Добавить запись в ленту' }).click();
   await page.locator('summary').filter({ hasText: 'Добавить версию' }).click();
   await page.getByLabel('Название версии').fill(versionName);
   await page.getByLabel('Безопасный URL').fill('https://example.com/');
@@ -105,8 +105,10 @@ test('owner publishes a checked version and client closes structured feedback', 
     await database.pool.end();
   }
   await page.reload();
+  await expect(page.getByText('Готова к публикации')).toBeVisible();
   await page.getByRole('button', { name: 'Показать клиенту' }).click();
-  await expect(page.getByText('Доступна клиенту')).toBeVisible();
+  await expect(page.getByText('Показана клиенту')).toBeVisible();
+  await expect(page.getByText(/Снимок (поставлен в очередь|создаётся|готов)/)).toBeVisible();
 
   const invitationLink = await latestLink(request, clientEmail);
   const clientContext = await browser.newContext();

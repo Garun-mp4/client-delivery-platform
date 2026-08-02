@@ -4,8 +4,8 @@ import { notFound } from 'next/navigation';
 import { isOwner } from '@garun/core/identity';
 import {
   canAccessProject,
-  getLatestProjectCoverCapture,
   getProjectCover,
+  getProjectCoverCaptureOverview,
   getClientProject,
   getInternalProject,
   listActiveClientCompanies,
@@ -131,17 +131,25 @@ async function renderProjectPage({ params, searchParams }: ProjectPageProps) {
       />
     );
   }
-  const [item, companies, workspaceMembers, members, invitations, workflow, cover, capture] =
-    await Promise.all([
-      getInternalProject(database.db, tenant, projectSlug),
-      listActiveClientCompanies(database.db, tenant),
-      listInternalWorkspaceMembers(database.db, tenant),
-      listProjectMembers(database.db, tenant, projectSlug),
-      listProjectInvitations(database.db, tenant, projectSlug),
-      getProjectWorkflow(database.db, tenant, projectSlug),
-      getProjectCover(database, tenant, projectSlug),
-      getLatestProjectCoverCapture(database, tenant, projectSlug).catch(() => null),
-    ]);
+  const [
+    item,
+    companies,
+    workspaceMembers,
+    members,
+    invitations,
+    workflow,
+    cover,
+    captureOverview,
+  ] = await Promise.all([
+    getInternalProject(database.db, tenant, projectSlug),
+    listActiveClientCompanies(database.db, tenant),
+    listInternalWorkspaceMembers(database.db, tenant),
+    listProjectMembers(database.db, tenant, projectSlug),
+    listProjectInvitations(database.db, tenant, projectSlug),
+    getProjectWorkflow(database.db, tenant, projectSlug),
+    getProjectCover(database, tenant, projectSlug),
+    getProjectCoverCaptureOverview(database, tenant, projectSlug).catch(() => null),
+  ]);
   if (!item) notFound();
   const archived = item.status === 'archived';
   const memberUserIds = new Set(members.map((member) => member.userId));
@@ -212,12 +220,14 @@ async function renderProjectPage({ params, searchParams }: ProjectPageProps) {
       />
       {canAccessProject(access, 'project.edit') ? (
         <CoverManager
-          captureStatus={capture?.status ?? null}
+          captureEligibility={captureOverview?.eligibility.status ?? 'no_version'}
+          captureStatus={captureOverview?.capture?.status ?? null}
           captureUrl={`/api/workspaces/${slug}/projects/${projectSlug}/cover/capture`}
           coverUrl={`/api/workspaces/${slug}/projects/${projectSlug}/cover`}
           disabled={archived}
           hasCover={Boolean(cover)}
           hasManualCover={cover?.kind === 'manual'}
+          reviewUrl={`/workspace/${slug}/projects/${projectSlug}/review`}
           uploadUrl={`/api/workspaces/${slug}/projects/${projectSlug}/cover/uploads`}
         />
       ) : null}

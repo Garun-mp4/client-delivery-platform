@@ -1,17 +1,16 @@
 # Статус реализации
 
-Последнее обновление: 2026-08-01
-Общий статус: Milestones 00–10 и UX stabilization 06.5 объединены с `main`; бесплатный hybrid
-staging готов для внутренней проверки web-потока, но не для внешнего клиентского пилота
+Последнее обновление: 2026-08-02
+Общий статус: Milestones 00–10 и staging safety объединены с `main`; выполняется локальный
+Milestone 10.5, внешний клиентский пилот и Milestone 11 не начаты
 
 ## Текущий milestone
 
-**Milestone 10 — production readiness и первый пилот: инженерная часть объединена с `main`.**
-Экспорт истории, observability, backup/restore, performance/security automation и pilot runbook
-готовы. Feature CI `30487810446` завершён успешно. Внешняя приёмка требует развёртывания
-предварительно выбранной production-like инфраструктуры и проведения реального пилота. Созданы
-отдельные бесплатные staging resources без карты: Vercel web, Supabase PostgreSQL/private S3 и
-Upstash Redis; worker, Mailpit и ClamAV намеренно остаются локальными.
+**Milestone 10.5 — локальная готовность перед Milestone 11: в работе.** Staging safety PR №2
+прошёл CI `30739873809` и объединён с `main`. Текущая ветка
+`codex/pre-milestone-11-readiness` проверяет полный MVP в актуальном Docker Compose, уточняет UX
+SiteVersion/capture и вводит единый server-side eligibility. Это не production readiness и не
+разрешение внешнего клиентского пилота.
 
 ## Завершённые задачи
 
@@ -98,17 +97,39 @@ Upstash Redis; worker, Mailpit и ClamAV намеренно остаются л�
 - Локальные Mailpit и ClamAV запущены через Compose и healthy. Внешние credentials находятся только
   в provider environment, не добавлены в Git; первоначально раскрытые setup credentials были
   отозваны и заменены.
+- Milestone 10.5 ввёл единый server-side capture eligibility с семью allowlisted состояниями,
+  безопасный GET/POST contract, однозначные статусы SiteVersion/capture и ограниченное
+  автообновление с ручным fallback.
+- Добавлен последовательный pilot E2E полного MVP. Свежий host-worker реально создал Chromium
+  capture и прошёл owner/client access, workflow, questionnaire, quarantine/ClamAV, review,
+  approvals, export, completion, archive/restore и revoke access.
+- E2E worker изолирован на `3101` и больше не переиспользует случайно запущенный Compose-worker;
+  dual-stack SSRF transport предпочитает проверенный IPv4 при отсутствии IPv6 route, продолжая
+  отклонять весь DNS answer при наличии private/special адреса.
 
 ## Текущие задачи
 
-- Провести внутренний rehearsal бизнес-пути на staging по `docs/PILOT_RUNBOOK.md`, не приглашая
-  внешнего клиента и не загружая реальные персональные данные.
+- Подтвердить реальный HTTPS capture именно из Compose-worker после включения прямого Docker/VPN
+  маршрута. Тот же финальный worker artifact уже прошёл полный pilot на host; контейнер текущей
+  машины получает `ECONNRESET` при прямом TLS-соединении к публичному IP.
+- После зелёного pilot E2E выполнить финальный regression, commit/PR, объединить Milestone 10.5 с
+  `main` и повторно проверить итоговый commit.
 - Выбрать always-on worker/scanner и реальный email provider до любого внешнего пилота. Бесплатная
   текущая схема не обеспечивает надёжную фоновую обработку.
 - Провести отдельный staging backup/restore drill и настроить alerts перед go/no-go.
 - Не начинать Milestone 11 до завершения внешнего release gate или отдельного решения владельца.
 
 ## Найденные проблемы
+
+- Первый последовательный pilot E2E продолжил owner-side flow до завершения client questionnaire
+  раньше, чем server action сохранила submission. Добавлено ожидание фактического сообщения
+  «Ответы отправлены разработчику»; после исправления сценарий прошёл этот участок и material flow.
+- Первоначальная root-команда `test:e2e:pilot` передавала лишний `--`, поэтому Playwright запускал
+  весь suite. Команда исправлена и теперь выбирает только `pilot.spec.ts`.
+- DNS публичного fixture возвращал AAAA раньше A при отсутствии рабочего IPv6 route. Safe transport
+  теперь после проверки всех DNS answers предпочитает IPv4; unit regression и полный host pilot
+  прошли. Compose-worker по-прежнему получает TLS reset от локальной VPN/Docker-сети, поэтому
+  Compose capture gate пока не объявлен успешным и Milestone 11 не начат.
 
 - Первая версия migration создавала composite foreign keys раньше supporting unique indexes. SQL
   `0012` переупорядочен и полностью применён на чистой PostgreSQL 17.
@@ -309,6 +330,20 @@ Upstash Redis; worker, Mailpit и ClamAV намеренно остаются л�
 - Staging bootstrap проверен отдельным read-only SQL-запросом: одна active owner membership,
   password account и audit event существуют. Browser smoke подтвердил password login,
   database-backed session и защищённый `/workspace/demo-studio`.
+- Milestone 10.5: frozen install, lint, strict typecheck и unit suites прошли; core 60/60,
+  worker 27/27, web 14/14. Первый финальный `format:check` обнаружил только формат нового worker
+  regression test; после `pnpm format` повторная проверка прошла.
+- Integration 41/41 и worker integration 5/5, security subset 22/22. `db:generate` сообщает
+  `No schema changes`; migrations `0000`–`0018` применены дважды к отдельной чистой PostgreSQL 17
+  (19 migration records) без дрейфа или повреждения.
+- Production Next.js/worker build и artifact verification прошли. Полный Playwright suite 27/27,
+  отдельный pilot 1/1 с реальным capture, accessibility desktop/mobile 17/17.
+- Performance fixture: p95 catalog 2.28 ms, comments 1.63 ms, files 4.36 ms. Backup/restore
+  восстановил 4 required tables; web/worker smoke и все liveness/readiness проверки прошли.
+- Compose image пересобран из текущих sources с frozen lockfile; migration/storage-init exited 0,
+  web, worker, PostgreSQL, Redis, MinIO, Mailpit и ClamAV healthy. Dependency audit содержит только
+  ADR-042 ignored dev-only advisory, secret scan прошёл для 417 файлов; свежие web/worker логи не
+  содержат error, URL или token-like значений.
 
 ## Следующие действия
 

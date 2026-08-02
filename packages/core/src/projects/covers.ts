@@ -6,6 +6,7 @@ import type { DatabaseClient } from '@garun/db';
 import {
   auditEvent,
   fileObject,
+  project,
   projectCoverAsset,
   projectCoverCapture,
   siteVersion,
@@ -20,6 +21,40 @@ export const PROJECT_COVER_MAX_BYTES = 10 * 1024 * 1024;
 export const projectCoverMimeTypes = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
 export type ProjectCoverKind = 'manual' | 'automatic';
+export type ProjectCoverCaptureEligibility =
+  | 'eligible'
+  | 'no_version'
+  | 'check_pending'
+  | 'unsafe'
+  | 'unreachable'
+  | 'password_protected'
+  | 'not_published';
+
+interface CaptureSourceState {
+  readonly securityStatus: 'pending' | 'checking' | 'safe' | 'unsafe' | 'error';
+  readonly availabilityStatus: 'pending' | 'reachable' | 'unreachable';
+  readonly accessMode: 'public' | 'password';
+  readonly clientVisible: boolean;
+}
+
+export function classifyProjectCoverCaptureEligibility(
+  version: CaptureSourceState | null,
+): ProjectCoverCaptureEligibility {
+  if (!version) return 'no_version';
+  if (
+    version.securityStatus === 'pending' ||
+    version.securityStatus === 'checking' ||
+    version.securityStatus === 'error' ||
+    version.availabilityStatus === 'pending'
+  ) {
+    return 'check_pending';
+  }
+  if (version.securityStatus === 'unsafe') return 'unsafe';
+  if (version.accessMode === 'password') return 'password_protected';
+  if (version.availabilityStatus === 'unreachable') return 'unreachable';
+  if (!version.clientVisible) return 'not_published';
+  return 'eligible';
+}
 
 export function resolveProjectCoverKind(kinds: readonly ProjectCoverKind[]) {
   return kinds.includes('manual')
@@ -30,10 +65,63 @@ export function resolveProjectCoverKind(kinds: readonly ProjectCoverKind[]) {
 }
 
 export class ProjectCoverError extends Error {
-  constructor(readonly code: 'NOT_FOUND' | 'INVALID_INPUT' | 'INVALID_STATE' | 'QUOTA_EXCEEDED') {
+  constructor(
+    readonly code: 'NOT_FOUND' | 'INVALID_INPUT' | 'INVALID_STATE' | 'QUOTA_EXCEEDED',
+    readonly eligibility?: ProjectCoverCaptureEligibility,
+  ) {
     super(code);
     this.name = 'ProjectCoverError';
   }
+}
+
+async function resolveCaptureEligibilityByProject(
+  client: DatabaseClient,
+  workspaceId: string,
+  projectId: string,
+): Promise<{ readonly status: ProjectCoverCaptureEligibility; readonly siteVersionId?: string }> {
+  const [eligible] = await client.db
+    .select({ id: siteVersion.id })
+    .from(siteVersion)
+    .where(
+      and(
+        eq(siteVersion.workspaceId, workspaceId),
+        eq(siteVersion.projectId, projectId),
+        eq(siteVersion.clientVisible, true),
+        eq(siteVersion.securityStatus, 'safe'),
+        eq(siteVersion.availabilityStatus, 'reachable'),
+        eq(siteVersion.accessMode, 'public'),
+      ),
+    )
+    .orderBy(desc(siteVersion.versionNumber))
+    .limit(1);
+  if (eligible) return { status: 'eligible', siteVersionId: eligible.id };
+
+  const [latest] = await client.db
+    .select({
+      securityStatus: siteVersion.securityStatus,
+      availabilityStatus: siteVersion.availabilityStatus,
+      accessMode: siteVersion.accessMode,
+      clientVisible: siteVersion.clientVisible,
+    })
+    .from(siteVersion)
+    .where(and(eq(siteVersion.workspaceId, workspaceId), eq(siteVersion.projectId, projectId)))
+    .orderBy(desc(siteVersion.versionNumber))
+    .limit(1);
+  return { status: classifyProjectCoverCaptureEligibility(latest ?? null) };
+}
+
+export async function getProjectCoverCaptureEligibility(
+  client: DatabaseClient,
+  tenant: TenantContext,
+  projectSlug: string,
+) {
+  const allowed = await access(client, tenant, projectSlug, 'project.edit');
+  const result = await resolveCaptureEligibilityByProject(
+    client,
+    tenant.workspaceId,
+    allowed.projectId,
+  );
+  return { status: result.status };
 }
 
 interface UploadInput {
@@ -378,7 +466,20 @@ export async function enqueueProjectCoverCapture(
 ) {
   const allowed = await access(client, tenant, projectSlug, 'project.edit');
   const key = requireText(idempotencyKey, 100);
+  const eligibility = await resolveCaptureEligibilityByProject(
+    client,
+    tenant.workspaceId,
+    allowed.projectId,
+  );
+  if (eligibility.status !== 'eligible' || !eligibility.siteVersionId) {
+    throw new ProjectCoverError('INVALID_STATE', eligibility.status);
+  }
   return client.db.transaction(async (tx) => {
+    await tx
+      .select({ id: project.id })
+      .from(project)
+      .where(and(eq(project.id, allowed.projectId), eq(project.workspaceId, tenant.workspaceId)))
+      .for('update');
     const [version] = await tx
       .select({ id: siteVersion.id })
       .from(siteVersion)
@@ -394,7 +495,22 @@ export async function enqueueProjectCoverCapture(
       )
       .orderBy(desc(siteVersion.versionNumber))
       .limit(1);
-    if (!version) throw new ProjectCoverError('INVALID_STATE');
+    if (!version || version.id !== eligibility.siteVersionId) {
+      throw new ProjectCoverError('INVALID_STATE', 'check_pending');
+    }
+    const [active] = await tx
+      .select({ id: projectCoverCapture.id })
+      .from(projectCoverCapture)
+      .where(
+        and(
+          eq(projectCoverCapture.workspaceId, tenant.workspaceId),
+          eq(projectCoverCapture.projectId, allowed.projectId),
+          eq(projectCoverCapture.siteVersionId, version.id),
+          inArray(projectCoverCapture.status, ['pending', 'processing']),
+        ),
+      )
+      .limit(1);
+    if (active) return null;
     const [job] = await tx
       .insert(projectCoverCapture)
       .values({
@@ -418,6 +534,35 @@ export async function enqueueProjectCoverCapture(
     }
     return job ?? null;
   });
+}
+
+export async function getProjectCoverCaptureOverview(
+  client: DatabaseClient,
+  tenant: TenantContext,
+  projectSlug: string,
+) {
+  const allowed = await access(client, tenant, projectSlug, 'project.edit');
+  const [eligibility, [capture]] = await Promise.all([
+    resolveCaptureEligibilityByProject(client, tenant.workspaceId, allowed.projectId),
+    client.db
+      .select({
+        status: projectCoverCapture.status,
+        updatedAt: projectCoverCapture.updatedAt,
+      })
+      .from(projectCoverCapture)
+      .where(
+        and(
+          eq(projectCoverCapture.workspaceId, tenant.workspaceId),
+          eq(projectCoverCapture.projectId, allowed.projectId),
+        ),
+      )
+      .orderBy(desc(projectCoverCapture.createdAt))
+      .limit(1),
+  ]);
+  return {
+    capture: capture ?? null,
+    eligibility: { status: eligibility.status },
+  };
 }
 
 export async function getLatestProjectCoverCapture(

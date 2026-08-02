@@ -5,6 +5,7 @@ import {
   comment,
   feedbackItem,
   fileObject,
+  projectCoverCapture,
   projectUpdate,
   siteVersion,
   user,
@@ -22,7 +23,7 @@ export async function getProjectReview(
   const access = await resolveProjectAccess(client.db, tenant, projectSlug);
   if (!canAccessProject(access, 'project.view')) throw new ReviewServiceError('NOT_FOUND');
   const internal = access!.side === 'internal';
-  const [updates, versions, feedback, comments, screenshots] = await Promise.all([
+  const [updates, versions, feedback, comments, screenshots, captures] = await Promise.all([
     client.db
       .select()
       .from(projectUpdate)
@@ -91,11 +92,30 @@ export async function getProjectReview(
         ),
       )
       .orderBy(desc(fileObject.createdAt)),
+    internal
+      ? client.db
+          .select({
+            siteVersionId: projectCoverCapture.siteVersionId,
+            status: projectCoverCapture.status,
+          })
+          .from(projectCoverCapture)
+          .where(
+            and(
+              eq(projectCoverCapture.projectId, access!.projectId),
+              eq(projectCoverCapture.workspaceId, tenant.workspaceId),
+            ),
+          )
+          .orderBy(desc(projectCoverCapture.createdAt))
+      : Promise.resolve([]),
   ]);
   return {
     access: access!,
     updates,
-    versions,
+    versions: versions.map((version) => ({
+      ...version,
+      captureStatus:
+        captures.find((capture) => capture.siteVersionId === version.id)?.status ?? null,
+    })),
     feedback: feedback.map((item) => ({
       ...item,
       comments: comments.filter((entry) => entry.feedbackItemId === item.id),

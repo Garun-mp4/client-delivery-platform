@@ -84,7 +84,10 @@ export async function safeAddress(
   if (addresses.some((address) => isBlockedAddress(address))) {
     throw new Error('URL_ADDRESS_BLOCKED');
   }
-  return addresses[0]!;
+  // Prefer IPv4 when DNS returns both families. Some container and VPN environments resolve
+  // public AAAA records without providing an IPv6 route; pinning to that first answer would mark
+  // an otherwise reachable public site as unavailable. Every answer is still validated above.
+  return addresses.find((address) => isIP(address) === 4) ?? addresses[0]!;
 }
 
 export interface SafeResource {

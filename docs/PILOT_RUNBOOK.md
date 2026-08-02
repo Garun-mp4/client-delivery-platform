@@ -12,6 +12,25 @@
 Внешнего клиента нельзя приглашать, пока worker/scanner/email зависят от включённого компьютера и
 Mailpit: ссылка из локального почтового ящика не считается надёжной клиентской доставкой.
 
+## Локальный rehearsal Milestone 10.5
+
+1. Пересобрать актуальные sources: `docker compose up -d --build --wait`.
+2. Задать `PILOT_PUBLIC_SITE_URL` на вымышленный публичный HTTP(S)-сайт без пароля и клиентских
+   данных.
+3. Убедиться, что URL доступен напрямую: `curl.exe --noproxy "*" -I https://example.com`.
+4. Выполнить `pnpm test:e2e:pilot`.
+
+Сценарий последовательно проверяет owner/client access, scope, blocking action, анкету, material
+quarantine/scan, SiteVersion, реальный Chromium capture, feedback, назначенные согласования,
+export, completion, archive/restore и отзыв доступа. Письмо приглашения читается только из Mailpit;
+реальные адреса и персональные данные не используются.
+
+Capture eligibility вычисляется сервером и имеет только allowlisted состояния: `eligible`,
+`no_version`, `check_pending`, `unsafe`, `unreachable`, `password_protected`, `not_published`.
+Клиентский UI не вычисляет пригодность сам и не получает URL, внутренние ID или worker diagnostics.
+Проксирование browser traffic не является допустимым обходом отсутствующего прямого маршрута:
+renderer обязан сохранять DNS/IP validation и connection pinning для каждого ресурса.
+
 ## Знакомство клиента
 
 Письмо ведёт сразу в проект. На первом созвоне проверяются mobile login, следующее действие,

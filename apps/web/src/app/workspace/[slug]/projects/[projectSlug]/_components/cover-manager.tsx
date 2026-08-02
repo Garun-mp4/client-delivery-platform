@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type DragEvent, useRef, useState } from 'react';
 
@@ -12,6 +13,25 @@ const captureStatusLabels: Record<string, string> = {
   processing: 'Снимок создаётся',
   succeeded: 'Последний снимок готов',
   failed: 'Не удалось создать последний снимок',
+};
+
+type CaptureEligibility =
+  | 'eligible'
+  | 'no_version'
+  | 'check_pending'
+  | 'unsafe'
+  | 'unreachable'
+  | 'password_protected'
+  | 'not_published';
+
+const captureEligibilityLabels: Record<Exclude<CaptureEligibility, 'eligible'>, string> = {
+  no_version: 'Сначала добавьте версию сайта.',
+  check_pending: 'Дождитесь завершения безопасной проверки ссылки.',
+  unsafe: 'Ссылка заблокирована проверкой безопасности.',
+  unreachable: 'Сайт недоступен для автоматического снимка.',
+  password_protected: 'Снимок доступен только для публичной версии без preview-пароля.',
+  not_published:
+    'Покажите проверенную версию клиенту — первый снимок поставится в очередь автоматически.',
 };
 
 function formatFileSize(size: number) {
@@ -52,6 +72,8 @@ export function CoverManager({
   hasManualCover,
   hasCover,
   captureStatus,
+  captureEligibility,
+  reviewUrl,
   disabled,
 }: {
   readonly coverUrl: string;
@@ -60,6 +82,8 @@ export function CoverManager({
   readonly hasManualCover: boolean;
   readonly hasCover: boolean;
   readonly captureStatus: string | null;
+  readonly captureEligibility: CaptureEligibility;
+  readonly reviewUrl: string;
   readonly disabled: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
@@ -69,6 +93,8 @@ export function CoverManager({
   const [busyAction, setBusyAction] = useState<'upload' | 'capture' | 'remove' | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const busy = busyAction !== null;
+  const captureProcessing = captureStatus === 'pending' || captureStatus === 'processing';
+  const captureAvailable = captureEligibility === 'eligible' && !captureProcessing;
 
   function selectFile(file: File | undefined) {
     if (!file) return;
@@ -146,11 +172,19 @@ export function CoverManager({
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ idempotencyKey: `manual:${crypto.randomUUID()}` }),
     });
-    setMessage(
-      response.ok
-        ? 'Снимок поставлен в очередь. Предыдущая обложка останется до готовности.'
-        : 'Нет подходящей опубликованной публичной версии сайта.',
-    );
+    if (response.ok) {
+      setMessage('Снимок поставлен в очередь. Предыдущая обложка останется до готовности.');
+    } else {
+      const result = (await response.json().catch(() => null)) as {
+        error?: { reason?: CaptureEligibility };
+      } | null;
+      const reason = result?.error?.reason;
+      setMessage(
+        reason && reason !== 'eligible'
+          ? captureEligibilityLabels[reason]
+          : 'Снимок сейчас недоступен. Обновите статус версии во вкладке «Проверка».',
+      );
+    }
     setBusyAction(null);
     router.refresh();
   }
@@ -246,14 +280,28 @@ export function CoverManager({
                 {captureStatusLabels[captureStatus] ?? 'Статус снимка обновлён'}
               </small>
             ) : null}
+            {captureEligibility !== 'eligible' ? (
+              <small className="cover-capture-help">
+                {captureEligibilityLabels[captureEligibility]}{' '}
+                <Link href={reviewUrl}>Открыть «Проверку»</Link>
+              </small>
+            ) : (
+              <small className="cover-capture-help">
+                Подходящая версия опубликована. При необходимости снимок можно обновить вручную.
+              </small>
+            )}
           </div>
           <button
             type="button"
             className="secondary"
             onClick={() => void capture()}
-            disabled={disabled || busy}
+            disabled={disabled || busy || !captureAvailable}
           >
-            {busyAction === 'capture' ? 'Ставим в очередь…' : 'Обновить снимок'}
+            {busyAction === 'capture'
+              ? 'Ставим в очередь…'
+              : captureProcessing
+                ? 'Снимок обрабатывается'
+                : 'Обновить снимок'}
           </button>
         </div>
 

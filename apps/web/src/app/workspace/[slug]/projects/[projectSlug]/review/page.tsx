@@ -5,6 +5,7 @@ import { canAccessProject } from '@garun/core/projects';
 import { getProjectReview } from '@garun/core/review';
 
 import { ProjectNav } from '../_components/project-nav';
+import { VersionStatusRefresh } from './version-status-refresh';
 import { SubmitButton } from '@/app/_components/submit-button';
 import { requireTenantPage } from '@/lib/page-tenant';
 import { database } from '@/lib/server';
@@ -29,6 +30,29 @@ const statusLabels = {
   rejected: 'Отклонено',
 } as const;
 
+const captureLabels = {
+  pending: 'Снимок поставлен в очередь',
+  processing: 'Снимок создаётся',
+  succeeded: 'Снимок готов',
+  failed: 'Снимок завершился ошибкой',
+} as const;
+
+function versionStatusLabel(version: {
+  readonly securityStatus: string;
+  readonly availabilityStatus: string;
+  readonly clientVisible: boolean;
+}) {
+  if (
+    ['pending', 'checking', 'error'].includes(version.securityStatus) ||
+    version.availabilityStatus === 'pending'
+  ) {
+    return 'Проверяем ссылку';
+  }
+  if (version.securityStatus === 'unsafe') return 'Ссылка заблокирована';
+  if (version.availabilityStatus === 'unreachable') return 'Сайт недоступен';
+  return version.clientVisible ? 'Показана клиенту' : 'Готова к публикации';
+}
+
 export default async function ReviewPage({
   params,
   searchParams,
@@ -46,6 +70,15 @@ export default async function ReviewPage({
   const visibleVersions = review.versions.filter(
     (version) => internal || (version.clientVisible && version.securityStatus === 'safe'),
   );
+  const autoRefreshActive =
+    internal &&
+    visibleVersions.some(
+      (version) =>
+        ['pending', 'checking', 'error'].includes(version.securityStatus) ||
+        version.availabilityStatus === 'pending' ||
+        version.captureStatus === 'pending' ||
+        version.captureStatus === 'processing',
+    );
 
   return (
     <main className="workspace-shell">
@@ -95,7 +128,7 @@ export default async function ReviewPage({
         {editable && !archived ? (
           <details className="disclosure-panel form-section">
             <summary>
-              <span className="disclosure-title">Опубликовать обновление</span>
+              <span className="disclosure-title">Добавить запись в ленту</span>
             </summary>
             <div className="disclosure-body">
               <form
@@ -126,7 +159,7 @@ export default async function ReviewPage({
                   <input name="pinned" type="checkbox" value="yes" />
                   Закрепить первым
                 </label>
-                <SubmitButton pendingText="Публикуем…">Опубликовать</SubmitButton>
+                <SubmitButton pendingText="Добавляем…">Добавить запись в ленту</SubmitButton>
               </form>
             </div>
           </details>
@@ -136,6 +169,18 @@ export default async function ReviewPage({
       <section className="panel" aria-labelledby="versions-title">
         <p className="eyebrow">Результат</p>
         <h2 id="versions-title">Версии сайта</h2>
+        {internal ? (
+          <>
+            <p className="muted version-flow-copy">
+              Сначала ссылка проходит безопасную проверку. Кнопка «Показать клиенту» делает версию
+              доступной клиенту; для подходящей публичной версии первый снимок ставится в очередь
+              автоматически.
+            </p>
+            {visibleVersions.length > 0 ? (
+              <VersionStatusRefresh active={autoRefreshActive} />
+            ) : null}
+          </>
+        ) : null}
         {visibleVersions.length === 0 ? (
           <p className="empty">
             {internal
@@ -153,16 +198,14 @@ export default async function ReviewPage({
                     </small>
                     <h3>{version.name}</h3>
                   </div>
-                  <span className="status-pill">
-                    {version.clientVisible
-                      ? 'Доступна клиенту'
-                      : version.securityStatus === 'pending' ||
-                          version.securityStatus === 'checking'
-                        ? 'Проверяем ссылку'
-                        : version.securityStatus === 'unsafe'
-                          ? 'Ссылка заблокирована'
-                          : 'Готова к публикации'}
-                  </span>
+                  <div className="version-state-stack">
+                    <span className="status-pill">{versionStatusLabel(version)}</span>
+                    {internal && version.captureStatus ? (
+                      <small className={`cover-capture-status is-${version.captureStatus}`}>
+                        {captureLabels[version.captureStatus]}
+                      </small>
+                    ) : null}
+                  </div>
                 </header>
                 {version.description ? <p>{version.description}</p> : null}
                 <div className="review-instructions">
@@ -203,6 +246,10 @@ export default async function ReviewPage({
                       </label>
                     ) : null}
                     <SubmitButton pendingText="Публикуем версию…">Показать клиенту</SubmitButton>
+                    <small className="muted">
+                      Клиент получит доступ именно к этой версии. Публичная и доступная ссылка также
+                      запустит создание первой обложки.
+                    </small>
                   </form>
                 ) : null}
               </li>

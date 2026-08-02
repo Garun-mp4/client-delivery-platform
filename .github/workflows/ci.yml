@@ -54,6 +54,8 @@ jobs:
       TEST_SCANNER_PORT: 3310
       E2E_OWNER_EMAIL: e2e-owner@example.test
       E2E_OWNER_PASSWORD: E2eOwnerPassword-2026!
+      PILOT_PUBLIC_SITE_URL: https://example.com/
+      COVER_BROWSER_EXECUTABLE_PATH: /usr/bin/google-chrome
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

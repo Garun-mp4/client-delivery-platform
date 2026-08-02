@@ -5,6 +5,7 @@ import {
   fetchSafeResource,
   isBlockedAddress,
   normalizeCheckedUrl,
+  safeAddress,
 } from './url-security';
 
 describe('SSRF URL boundary', () => {
@@ -58,6 +59,12 @@ describe('SSRF URL boundary', () => {
       }),
     ).rejects.toThrow('URL_ADDRESS_BLOCKED');
     expect(requested).toBe(false);
+  });
+
+  it('prefers a validated IPv4 answer when IPv6 has no route', async () => {
+    await expect(
+      safeAddress('dual-stack.example', async () => ['2606:4700:4700::1111', '1.1.1.1']),
+    ).resolves.toBe('1.1.1.1');
   });
 
   it('blocks renderer resources before opening a socket to a private address', async () => {

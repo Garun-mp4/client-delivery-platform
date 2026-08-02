@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import {
   enqueueProjectCoverCapture,
-  getLatestProjectCoverCapture,
+  getProjectCoverCaptureOverview,
   ProjectCoverError,
 } from '@garun/core/projects';
 
@@ -17,10 +17,9 @@ export async function GET(
   const tenant = await tenantFromRequest(request, slug);
   if (!tenant) return NextResponse.json({ error: { code: 'NOT_FOUND' } }, { status: 404 });
   try {
-    return NextResponse.json(
-      { capture: await getLatestProjectCoverCapture(database, tenant, projectSlug) },
-      { headers: { 'cache-control': 'no-store' } },
-    );
+    return NextResponse.json(await getProjectCoverCaptureOverview(database, tenant, projectSlug), {
+      headers: { 'cache-control': 'no-store' },
+    });
   } catch {
     return NextResponse.json({ error: { code: 'NOT_FOUND' } }, { status: 404 });
   }
@@ -51,6 +50,13 @@ export async function POST(
         : error instanceof ProjectCoverError && error.code === 'NOT_FOUND'
           ? 404
           : 422;
-    return NextResponse.json({ error: { code: 'CAPTURE_NOT_AVAILABLE' } }, { status });
+    const reason =
+      error instanceof ProjectCoverError && error.code === 'INVALID_STATE'
+        ? error.eligibility
+        : undefined;
+    return NextResponse.json(
+      { error: { code: 'CAPTURE_NOT_AVAILABLE', ...(reason ? { reason } : {}) } },
+      { status },
+    );
   }
 }

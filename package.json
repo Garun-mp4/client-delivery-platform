@@ -17,6 +17,7 @@
     "test": "turbo run test",
     "test:integration": "turbo run test:integration",
     "test:e2e": "turbo run test:e2e",
+    "test:e2e:pilot": "pnpm --filter @garun/web exec playwright test pilot.spec.ts",
     "test:security": "pnpm --filter @garun/integration-tests exec vitest run src/identity.integration.test.ts src/projects.integration.test.ts src/materials.integration.test.ts src/approvals.integration.test.ts src/exports.integration.test.ts",
     "test:a11y": "pnpm --filter @garun/web exec playwright test foundation.spec.ts projects.spec.ts",
     "test:performance": "pnpm --filter @garun/ops test:performance",

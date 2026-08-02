@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  classifyProjectCoverCaptureEligibility,
   parseProjectCoverUpload,
   PROJECT_COVER_MAX_BYTES,
   resolveProjectCoverKind,
@@ -47,5 +48,76 @@ describe('project covers', () => {
         'request-3',
       ),
     ).toThrowError('INVALID_INPUT');
+  });
+
+  it.each([
+    [null, 'no_version'],
+    [
+      {
+        securityStatus: 'pending',
+        availabilityStatus: 'pending',
+        accessMode: 'public',
+        clientVisible: false,
+      },
+      'check_pending',
+    ],
+    [
+      {
+        securityStatus: 'unsafe',
+        availabilityStatus: 'unreachable',
+        accessMode: 'password',
+        clientVisible: false,
+      },
+      'unsafe',
+    ],
+    [
+      {
+        securityStatus: 'safe',
+        availabilityStatus: 'reachable',
+        accessMode: 'password',
+        clientVisible: true,
+      },
+      'password_protected',
+    ],
+    [
+      {
+        securityStatus: 'safe',
+        availabilityStatus: 'unreachable',
+        accessMode: 'public',
+        clientVisible: true,
+      },
+      'unreachable',
+    ],
+    [
+      {
+        securityStatus: 'safe',
+        availabilityStatus: 'reachable',
+        accessMode: 'public',
+        clientVisible: false,
+      },
+      'not_published',
+    ],
+    [
+      {
+        securityStatus: 'safe',
+        availabilityStatus: 'reachable',
+        accessMode: 'public',
+        clientVisible: true,
+      },
+      'eligible',
+    ],
+  ] as const)('classifies capture eligibility as %s', (version, expected) => {
+    expect(classifyProjectCoverCaptureEligibility(version)).toBe(expected);
+  });
+
+  it('keeps an unfinished check ahead of later eligibility reasons', () => {
+    expect(
+      classifyProjectCoverCaptureEligibility({
+        securityStatus: 'error',
+        availabilityStatus: 'unreachable',
+        accessMode: 'password',
+        clientVisible: false,
+      }),
+    ).toBe('check_pending');
   });
 });

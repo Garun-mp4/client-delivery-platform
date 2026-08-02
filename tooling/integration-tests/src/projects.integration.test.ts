@@ -17,6 +17,8 @@ import {
   getClientProject,
   getInternalClientCompany,
   getProjectCover,
+  getProjectCoverCaptureEligibility,
+  getProjectCoverCaptureOverview,
   initiateProjectCoverUpload,
   publishProject,
   removeManualProjectCover,
@@ -340,6 +342,15 @@ describe('clients, projects and explicit access grants', () => {
     await expect(getProjectCover(client, tenantB, `site-a-${suffix}`)).rejects.toMatchObject({
       code: 'NOT_FOUND',
     });
+    expect(await getProjectCoverCaptureEligibility(client, tenantA, `site-a-${suffix}`)).toEqual({
+      status: 'no_version',
+    });
+    await expect(
+      getProjectCoverCaptureEligibility(client, tenantB, `site-a-${suffix}`),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(
+      enqueueProjectCoverCapture(client, clientTenant, `site-a-${suffix}`, `client-${suffix}`),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
 
     const [version] = await client.db
       .insert(siteVersion)
@@ -362,10 +373,27 @@ describe('clients, projects and explicit access grants', () => {
       })
       .returning({ id: siteVersion.id });
     const key = `manual-capture-${suffix}`;
+    expect(await getProjectCoverCaptureEligibility(client, tenantA, `site-a-${suffix}`)).toEqual({
+      status: 'eligible',
+    });
     expect(
       await enqueueProjectCoverCapture(client, tenantA, `site-a-${suffix}`, key),
     ).not.toBeNull();
     expect(await enqueueProjectCoverCapture(client, tenantA, `site-a-${suffix}`, key)).toBeNull();
+    expect(
+      await enqueueProjectCoverCapture(
+        client,
+        tenantA,
+        `site-a-${suffix}`,
+        `second-active-${suffix}`,
+      ),
+    ).toBeNull();
+    expect(await getProjectCoverCaptureOverview(client, tenantA, `site-a-${suffix}`)).toMatchObject(
+      {
+        capture: { status: 'pending' },
+        eligibility: { status: 'eligible' },
+      },
+    );
     const jobs = await client.db
       .select({ id: projectCoverCapture.id })
       .from(projectCoverCapture)

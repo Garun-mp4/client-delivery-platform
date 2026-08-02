@@ -373,9 +373,68 @@ screenshot SaaS, client upload, публичные object URLs, crop editor, gal
 
 **Не входит.** Публичный SaaS launch, payments, full change requests, SDK и integrations. MVP допускается только для контролируемого пилота до отдельного production readiness review.
 
+## 13.5. Milestone 10.5 — локальная готовность перед Milestone 11
+
+**Цель.** Подтвердить полный MVP-путь на актуальной локальной Docker Compose сборке, убрать
+неоднозначность между лентой обновлений, публикацией SiteVersion и созданием обложки, получить
+зелёный regression gate. Результат разрешает продолжать локальную разработку, но не является
+production readiness или разрешением внешнего клиентского пилота.
+
+**Функции.** Централизованный capture eligibility
+`eligible | no_version | check_pending | unsafe | unreachable | password_protected | not_published`;
+безопасный GET/POST cover contract; однозначные русские статусы проверки/публикации/capture;
+ограниченное автообновление статуса с ручным fallback; недоступная кнопка снимка с конкретной
+причиной и ссылкой на «Проверку»; один последовательный локальный pilot E2E полного MVP-пути.
+
+**Модули и файлы.** `packages/core/src/projects/covers*`, cover Route Handler и UI manager;
+review query/page и небольшой status refresher; `apps/web/e2e/pilot.spec.ts`; README, pilot runbook,
+STATUS, DECISIONS и этот план.
+
+**База данных.** Новых таблиц не требуется. Проверяются clean install, migration drift, применение
+существующих migrations к пустой БД и upgrade текущей БД. Повторная ручная постановка capture
+сериализуется и не создаёт несколько активных заданий для одной версии.
+
+**Безопасность.** Eligibility вычисляется только после session → tenant → project policy;
+`workspaceId` из запроса не принимается; API возвращает только allowlisted reason и безопасный
+статус без URL, токенов, внутренних ID и worker diagnostics; старую обложку не удаляет pending,
+retry или failure; сохраняются SSRF-safe renderer, cross-tenant и IDOR защиты.
+
+**Тесты.** Unit всех семи eligibility состояний и приоритетов; integration публикации, единственной
+автоматической очереди, active-job dedupe, retry/failure/previous cover, ролей/tenant/IDOR;
+последовательный pilot E2E: owner/client, scope, анкета, material quarantine/scan, SiteVersion,
+capture, feedback, approval, handover/completion, notification/export/archive/restore/revoke;
+axe, desktop/mobile 390 px, keyboard smoke и performance fixture без N+1.
+
+**Команды проверки.** Clean `pnpm install --frozen-lockfile`; `docker compose up -d --build --wait`;
+format, lint, strict typecheck, unit/integration/security, migration drift + clean/upgrade,
+production build/artifact verification, full E2E/pilot/a11y/performance, dependency/secret audits,
+backup/restore, health/smoke, log review, `git diff --check` и tracked-file audit.
+
+**Критерии приёмки.** Compose image собран из текущего commit; реальный локальный capture создал
+изображение; полный MVP rehearsal завершён; все gates зелёные; нет открытых P0/P1; документация
+совпадает с фактом; ветка объединена через PR и итоговый `main` повторно проверен.
+
+**Зависимости.** Milestones 00–10 и Milestone 07.5; локальные PostgreSQL, Redis, MinIO, Mailpit,
+ClamAV и Chromium worker доступны через Compose.
+
+**Не входит.** Milestone 11, VPS, домен, always-on production infrastructure, реальный email,
+банковские карты, платные providers и внешний клиентский пилот.
+
 ## 14. Milestone 11 — professional workflow
 
 **Цель.** Добавить коммерческий и повторяемый workflow после подтверждения ценности MVP.
+
+**Зарезервированная последовательность.** Milestone 11 выполняется только после отдельного решения
+и разбит на независимые рабочие части:
+
+1. **11.1 — шаблоны:** Project/Questionnaire templates и snapshot isolation.
+2. **11.2 — Change Requests:** revisions, estimate/price/deadline/acceptance и связь с agreed scope/feedback.
+3. **11.3 — ручные платежи:** PaymentMilestone/Payment/partial/refund и отдельные financial permissions.
+4. **11.4 — поиск, экспорт и квоты:** global search/filter, расширенный ZIP/CSV/originals export и quota policies.
+5. **11.5 — Telegram, white-label и аналитика:** opt-in adapter, workspace branding без custom domain и product analytics без content/PII.
+
+Каждая часть перед реализацией получает отдельные критерии, ветку и explicit start decision;
+резервирование структуры не означает начало Milestone 11.
 
 **Функции.** Project/questionnaire templates; полноценные ChangeRequest revisions/estimate/price/deadline/acceptance; связь с agreed scope и feedback; manual PaymentMilestone/Payment/partial/refund; financial permissions; Telegram opt-in; global search/filter; full ZIP/CSV/originals export; workspace white-label без custom domain; quotas и product analytics без content/PII.
 

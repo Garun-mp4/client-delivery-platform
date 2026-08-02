@@ -536,6 +536,43 @@
   background: var(--revision-red-soft);
   color: var(--revision-red);
 }
+.cover-capture-help {
+  max-width: 58ch;
+  margin-top: 4px;
+  color: var(--ink-secondary);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.cover-capture-help a {
+  color: var(--marker-green-strong);
+  font-weight: 750;
+}
+.version-flow-copy {
+  max-width: 72ch;
+}
+.version-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 14px 0 18px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--surface-inset);
+  color: var(--ink-secondary);
+  font-size: 0.82rem;
+}
+.version-refresh .button-link {
+  min-height: 44px;
+  margin: 0;
+  white-space: nowrap;
+}
+.version-state-stack {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
 .cover-management-footer {
   display: flex;
   justify-content: space-between;
@@ -633,6 +670,17 @@ button.cover-remove-action:hover {
   }
   .cover-upload-actions button {
     width: 100%;
+  }
+  .version-refresh {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .version-refresh .button-link {
+    justify-content: flex-start;
+  }
+  .version-state-stack {
+    justify-items: start;
   }
   .catalog-heading {
     align-items: start;

@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const webServerPort = process.env.WEB_SERVER_PORT ?? '3100';
+const workerServerPort = process.env.WORKER_SERVER_PORT ?? '3101';
 const baseURL = process.env.WEB_BASE_URL ?? `http://localhost:${webServerPort}`;
 
 export default defineConfig({
@@ -25,6 +26,7 @@ export default defineConfig({
         '**/projects.spec.ts',
         '**/questionnaires.spec.ts',
         '**/review.spec.ts',
+        '**/pilot.spec.ts',
       ],
       use: { ...devices['Pixel 7'], channel: 'chrome' },
     },
@@ -39,9 +41,10 @@ export default defineConfig({
     },
     {
       command: 'pnpm --filter @garun/worker start',
-      reuseExistingServer: true,
+      env: { WORKER_PORT: workerServerPort },
+      reuseExistingServer: false,
       timeout: 120_000,
-      url: 'http://127.0.0.1:3001/health/live',
+      url: `http://127.0.0.1:${workerServerPort}/health/live`,
     },
   ],
 });

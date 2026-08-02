@@ -69,6 +69,9 @@ test('owner publishes one project and grants then revokes explicit client access
   await page.getByRole('button', { name: 'Создать черновик' }).click();
   await expect(page).toHaveURL(new RegExp(`/projects/${projectSlug}`));
   await expect(page.getByText('Перетащите изображение сюда')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Обновить снимок' })).toBeDisabled();
+  await expect(page.getByText('Сначала добавьте версию сайта.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Открыть «Проверку»' })).toBeVisible();
   await page.getByLabel('Выбрать изображение').setInputFiles({
     name: 'cover.png',
     mimeType: 'image/png',
