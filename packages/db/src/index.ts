@@ -5,6 +5,14 @@ import { parseDatabaseEnv } from '@garun/config';
 
 import * as schema from './schema';
 
+export interface DatabaseConnectionOptions {
+  readonly connectionString: string;
+  readonly ssl?: {
+    readonly ca: string;
+    readonly rejectUnauthorized: true;
+  };
+}
+
 export interface DatabaseClient {
   readonly db: ReturnType<typeof drizzle<typeof schema>>;
   readonly pool: Pool;
@@ -51,15 +59,38 @@ export async function withDatabaseReadRetry<T>(
 
 export function createDatabaseClient(
   databaseUrl = parseDatabaseEnv().DATABASE_URL,
+  databaseSslCa = process.env.DATABASE_SSL_CA,
 ): DatabaseClient {
-  const pool = new Pool({ connectionString: databaseUrl, max: 10 });
+  const pool = new Pool({
+    ...createDatabaseConnectionOptions(databaseUrl, databaseSslCa),
+    max: 10,
+  });
   return { db: drizzle({ client: pool, schema }), pool };
 }
 
-export async function checkDatabase(databaseUrl?: string): Promise<void> {
+export function createDatabaseConnectionOptions(
+  databaseUrl: string,
+  databaseSslCa?: string,
+): DatabaseConnectionOptions {
+  if (!databaseSslCa) return { connectionString: databaseUrl };
+
+  const connectionUrl = new URL(databaseUrl);
+  connectionUrl.searchParams.delete('sslmode');
+  connectionUrl.searchParams.delete('uselibpqcompat');
+
+  return {
+    connectionString: connectionUrl.toString(),
+    ssl: { ca: databaseSslCa, rejectUnauthorized: true },
+  };
+}
+
+export async function checkDatabase(
+  databaseUrl?: string,
+  databaseSslCa = process.env.DATABASE_SSL_CA,
+): Promise<void> {
   const connectionString = databaseUrl ?? parseDatabaseEnv().DATABASE_URL;
   const pool = new Pool({
-    connectionString,
+    ...createDatabaseConnectionOptions(connectionString, databaseSslCa),
     connectionTimeoutMillis: 2_000,
     max: 1,
     query_timeout: 2_000,
